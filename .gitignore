@@ -10,6 +10,7 @@ test-results/
 !.env.example
 *.log
 data/
+deploy/runtime.env
 apps/server/prisma/generated/
 .taste-skill/
 deliverables/*.zip

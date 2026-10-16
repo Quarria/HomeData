@@ -24,7 +24,7 @@ services:
       context: ..
       dockerfile: deploy/Dockerfile.server
     command: ["./node_modules/.bin/prisma", "migrate", "deploy"]
-    env_file: .env
+    env_file: runtime.env
     depends_on: { db: { condition: service_healthy } }
     restart: "no"
     networks: [private]
@@ -35,7 +35,7 @@ services:
       context: ..
       dockerfile: deploy/Dockerfile.server
     command: ["node", "dist/src/main.js"]
-    env_file: .env
+    env_file: runtime.env
     depends_on:
       {
         db: { condition: service_healthy },
@@ -53,7 +53,7 @@ services:
       context: ..
       dockerfile: deploy/Dockerfile.server
     command: ["node", "dist/worker.js"]
-    env_file: .env
+    env_file: runtime.env
     depends_on:
       {
         db: { condition: service_healthy },

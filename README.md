@@ -124,7 +124,7 @@ pnpm build
 
 ## 部署概览
 
-生产环境使用 PostgreSQL，不使用 PGlite。仓库内 `deploy/compose.yaml` 定义了数据库、一次性迁移、API、worker 和 Web 服务。首次部署前，复制 `deploy/env.example` 为 `deploy/.env` 并填写公网 IP 来源（如 `http://服务器IP:8080`）、数据库凭证、会话密钥和加密密钥；AI 保持关闭，除非部署者主动配置服务端模型密钥。当前可通过 HTTP 按 IP 访问，登录 Cookie 会兼容 HTTP。
+生产环境使用 PostgreSQL，不使用 PGlite。仓库内 `deploy/compose.yaml` 定义了数据库、一次性迁移、API、worker 和 Web 服务。首次部署前，分别复制 `deploy/env.example` 为 `deploy/.env`、复制 `deploy/runtime.env.example` 为 `deploy/runtime.env`，填写公网 IP 来源、数据库凭证、会话密钥和加密密钥；数据库管理员密码与应用运行配置分开保存，AI 默认关闭。当前可通过 HTTP 按 IP 访问，登录 Cookie 会兼容 HTTP。默认持久化目录为 `/home/docker/postgres` 和 `/home/docker/homedata/receipts`。
 
 示意流程：
 
@@ -138,7 +138,7 @@ pnpm build
                           └────────► Worker（提醒、AI后台任务）
 ```
 
-当前 Compose 启动会在服务器构建镜像，`HTTP_PORT` 默认映射为 `8080`。HTTP 不加密账号密码和会话信息，仅适合受限的初始访问；建议限制防火墙来源，并避免在未加密连接中录入敏感账目信息。服务器资源较小时，可在本地或 CI 构建镜像后再部署。详细步骤、环境变量、数据库模型、接口和验收清单见[开发技术文档](docs/家常账-开发技术文档.md)。
+当前 Compose 启动会在服务器构建镜像，`HTTP_PORT` 默认映射为 `8080`。Docker 与 containerd 的运行数据也可配置到 `/home/docker`。HTTP 不加密账号密码和会话信息，仅适合受限的初始访问；建议限制防火墙来源，并避免在未加密连接中录入敏感账目信息。服务器资源较小时，可在本地或 CI 构建镜像后再部署。详细步骤、环境变量、数据库模型、接口和验收清单见[开发技术文档](docs/家常账-开发技术文档.md)。
 
 ## 验证记录与说明
 
