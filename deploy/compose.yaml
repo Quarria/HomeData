@@ -9,7 +9,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
       POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD:?Set POSTGRES_APP_PASSWORD}
     volumes:
-      - postgres_data:/var/lib/postgresql
+      - ${POSTGRES_DATA_DIR:-/home/docker/postgres}:/var/lib/postgresql
       - ./postgres-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
@@ -23,7 +23,7 @@ services:
     build:
       context: ..
       dockerfile: deploy/Dockerfile.server
-    command: ["pnpm", "db:migrate:deploy"]
+    command: ["./node_modules/.bin/prisma", "migrate", "deploy"]
     env_file: .env
     depends_on: { db: { condition: service_healthy } }
     restart: "no"
@@ -34,7 +34,7 @@ services:
     build:
       context: ..
       dockerfile: deploy/Dockerfile.server
-    command: ["node", "apps/server/dist/src/main.js"]
+    command: ["node", "dist/src/main.js"]
     env_file: .env
     depends_on:
       {
@@ -44,7 +44,7 @@ services:
     restart: unless-stopped
     expose: ["3000"]
     volumes:
-      - receipts:/data/receipts
+      - ${RECEIPTS_DATA_DIR:-/home/docker/homedata/receipts}:/data/receipts
     networks: [private]
 
   worker:
@@ -52,7 +52,7 @@ services:
     build:
       context: ..
       dockerfile: deploy/Dockerfile.server
-    command: ["node", "apps/server/dist/worker.js"]
+    command: ["node", "dist/worker.js"]
     env_file: .env
     depends_on:
       {
@@ -61,10 +61,11 @@ services:
       }
     restart: unless-stopped
     volumes:
-      - receipts:/data/receipts
+      - ${RECEIPTS_DATA_DIR:-/home/docker/homedata/receipts}:/data/receipts
     networks: [private]
 
   web:
+    image: ${HOMEDATA_WEB_IMAGE:-homedata-web:latest}
     build:
       context: ..
       dockerfile: deploy/Dockerfile.web
@@ -73,9 +74,6 @@ services:
     ports: ["${HTTP_PORT:-8080}:80"]
     networks: [private]
 
-volumes:
-  postgres_data:
-  receipts:
 networks:
   private:
     internal: false
