@@ -20,6 +20,30 @@ describe("environment validation", () => {
     ).toThrow(/SESSION_SECRET.*CREDENTIAL_ENCRYPTION_KEY/);
   });
 
+  it("allows production HTTP when the origin is an IP address", () => {
+    const result = validateEnvironment({
+      NODE_ENV: "production",
+      DATABASE_URL: "postgresql://localhost/test",
+      APP_ORIGIN: "http://203.0.113.10:8080",
+      SESSION_SECRET: "s".repeat(32),
+      CREDENTIAL_ENCRYPTION_KEY: "k".repeat(32),
+    });
+
+    expect(result.APP_ORIGIN).toBe("http://203.0.113.10:8080");
+  });
+
+  it("rejects production HTTP origins that use a domain name", () => {
+    expect(() =>
+      validateEnvironment({
+        NODE_ENV: "production",
+        DATABASE_URL: "postgresql://localhost/test",
+        APP_ORIGIN: "http://ledger.example.test",
+        SESSION_SECRET: "s".repeat(32),
+        CREDENTIAL_ENCRYPTION_KEY: "k".repeat(32),
+      }),
+    ).toThrow(/HTTP 时，APP_ORIGIN 只能配置为 IP 地址/);
+  });
+
   it("rejects the sample placeholders and reused production secrets", () => {
     expect(() =>
       validateEnvironment({

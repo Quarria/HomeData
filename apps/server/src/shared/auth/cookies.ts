@@ -15,17 +15,19 @@ export function readCookies(header: string | string[] | undefined) {
 }
 
 export const isProduction = () => process.env.NODE_ENV === "production";
+export const usesSecureCookies = () =>
+  isProduction() && process.env.APP_ORIGIN?.startsWith("https://") === true;
 export const sessionCookieName = () =>
-  isProduction() ? "__Host-hd_session" : "hd_session";
+  usesSecureCookies() ? "__Host-hd_session" : "hd_session";
 
 export function sessionCookie(token: string, maxAgeSeconds: number) {
-  return `${sessionCookieName()}=${encodeURIComponent(token)}; Path=/; Max-Age=${maxAgeSeconds}; HttpOnly; SameSite=Lax${isProduction() ? "; Secure" : ""}`;
+  return `${sessionCookieName()}=${encodeURIComponent(token)}; Path=/; Max-Age=${maxAgeSeconds}; HttpOnly; SameSite=Lax${usesSecureCookies() ? "; Secure" : ""}`;
 }
 
 export function clearSessionCookie() {
-  return `${sessionCookieName()}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax${isProduction() ? "; Secure" : ""}`;
+  return `${sessionCookieName()}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax${usesSecureCookies() ? "; Secure" : ""}`;
 }
 
 export function csrfCookie(token: string) {
-  return `hd_csrf=${encodeURIComponent(token)}; Path=/; Max-Age=43200; SameSite=Lax${isProduction() ? "; Secure" : ""}`;
+  return `hd_csrf=${encodeURIComponent(token)}; Path=/; Max-Age=43200; SameSite=Lax${usesSecureCookies() ? "; Secure" : ""}`;
 }

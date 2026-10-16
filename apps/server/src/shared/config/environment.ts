@@ -1,3 +1,4 @@
+import { isIP } from "node:net";
 import { z } from "zod";
 
 const environmentSchema = z.object({
@@ -47,8 +48,21 @@ export function validateEnvironment(
       throw new Error(
         `生产环境缺少必填密钥：${missing.map(([key]) => key).join(", ")}`,
       );
-    if (!config.APP_ORIGIN || !config.APP_ORIGIN.startsWith("https://")) {
-      throw new Error("生产环境必须配置 HTTPS APP_ORIGIN。");
+    if (!config.APP_ORIGIN) {
+      throw new Error("生产环境必须配置 APP_ORIGIN。");
+    }
+    const appOrigin = new URL(config.APP_ORIGIN);
+    if (
+      !["http:", "https:"].includes(appOrigin.protocol) ||
+      appOrigin.pathname !== "/" ||
+      appOrigin.search ||
+      appOrigin.hash
+    ) {
+      throw new Error("APP_ORIGIN 必须是完整的 HTTP 或 HTTPS 来源地址。");
+    }
+    const appHost = appOrigin.hostname.replace(/^\[|\]$/g, "");
+    if (appOrigin.protocol === "http:" && isIP(appHost) === 0) {
+      throw new Error("生产环境使用 HTTP 时，APP_ORIGIN 只能配置为 IP 地址。");
     }
     if (
       config.SESSION_SECRET?.startsWith("REPLACE_WITH_") ||

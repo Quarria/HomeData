@@ -14,16 +14,16 @@ import {
   shareUnlockRequestSchema,
 } from "@homedata/contracts";
 import type { AuthenticatedRequest } from "../../shared/auth/auth-types.js";
-import { isProduction, readCookies } from "../../shared/auth/cookies.js";
+import { readCookies, usesSecureCookies } from "../../shared/auth/cookies.js";
 import { Public } from "../../shared/auth/auth-metadata.js";
 import { apiSuccess, parseBody } from "../../shared/http/api-response.js";
 import { SharesService } from "./shares.service.js";
 
 const shareSessionCookieName = () =>
-  isProduction() ? "__Host-hd_share_session" : "hd_share_session";
+  usesSecureCookies() ? "__Host-hd_share_session" : "hd_share_session";
 
 function shareSessionCookie(token: string, maxAgeSeconds: number) {
-  return `${shareSessionCookieName()}=${encodeURIComponent(token)}; Path=/; Max-Age=${maxAgeSeconds}; HttpOnly; SameSite=Lax${isProduction() ? "; Secure" : ""}`;
+  return `${shareSessionCookieName()}=${encodeURIComponent(token)}; Path=/; Max-Age=${maxAgeSeconds}; HttpOnly; SameSite=Lax${usesSecureCookies() ? "; Secure" : ""}`;
 }
 
 @Controller()

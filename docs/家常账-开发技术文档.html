@@ -1268,7 +1268,7 @@ volumes:
   pgdata:
   receipts:</code></pre><p>该例以 PostgreSQL 18 系列镜像的目录结构为基线；使用其他大版本须按官方镜像说明核验卷路径，不能随意更换标签复用旧数据目录。API Dockerfile 的构建输出必须对应 <code>dist/main.js</code>、<code>dist/worker.js</code>；web镜像基于锁定Nginx镜像并复制Vite产物。生产脚本需加入API健康检查、worker心跳、资源限制、日志轮换和容器非root文件权限，不只依赖 depends_on。</p>
 <p>镜像初始化的POSTGRES_USER有较高权限，只用于初始化与迁移；初始化脚本另外创建无SUPERUSER／CREATEDB权限的homedata_app角色，API和worker的DATABASE_URL使用该角色，仅授予必要表和序列读写。迁移使用独立ADMIN_DATABASE_URL，不把它配置给长期运行的API／worker。</p>
-<h3 id="section-60">14.2 Nginx 与 HTTPS</h3><pre class="code"><code>server {
+<h3 id="section-60">14.2 Nginx 与 HTTP／HTTPS</h3><p>首阶段允许生产环境通过公网 IP 使用 HTTP，<code>APP_ORIGIN</code> 可填写 <code>http://&lt;服务器IP&gt;:&lt;HTTP_PORT&gt;</code>。应用仅接受 HTTP IP 来源，不接受 HTTP 域名；HTTP 下登录及访客会话 Cookie 不设置 <code>Secure</code>，以兼容浏览器。账号密码、会话和业务数据会以明文经过网络，只适合受限的初期访问，应限制防火墙来源并避免录入真实敏感账目。后续配置域名时再启用 HTTPS 和安全 Cookie。</p><p>以下为后续 HTTPS 域名入口示例：</p><pre class="code"><code>server {
     listen 80;
     server_name ledger.example.com;
     return 301 https://$host$request_uri;
@@ -1306,7 +1306,7 @@ server {
 </thead>
 <tbody><tr>
 <td>NODE_ENV、APP_ORIGIN、PORT</td>
-<td>production、实际https来源、内部3000</td>
+<td>production、HTTP公网IP来源或HTTPS域名来源、内部3000</td>
 </tr>
 <tr>
 <td>DATABASE_URL</td>
@@ -1351,13 +1351,13 @@ server {
 </tbody></table>
 <p><code>deploy/.env</code> 用于镜像与Compose变量替换，<code>runtime.env</code> 用于容器应用配置，两个文件都不提交版本库、权限限制给运维账号。<code>env.example</code> 只保存字段名及非秘密示例。前端 <code>VITE_*</code> 变量中不得有任何私钥、AI key、数据库URL或通知令牌。</p>
 <h3 id="section-62">14.4 首次上线流程</h3><ol>
-<li>确认服务器架构、系统、域名、HTTPS及AI／微信出站网络；记录镜像版本、区域、备份位置和运维负责人。</li>
+<li>确认服务器架构、系统、公网IP、HTTP端口及AI／微信出站网络；若后续使用域名再配置HTTPS。记录镜像版本、区域、备份位置和运维负责人。</li>
 <li>在本地／CI跑类型、单元、集成、E2E与构建，生成带发布号的server和web镜像，校验镜像架构与目标一致。</li>
 <li>准备环境文件、持久卷、私有目录权限和证书；执行 <code>docker compose --env-file .env config --quiet</code>，避免把展开后的密钥配置打印到日志。</li>
 <li><code>docker compose --env-file .env up -d db</code>，等待数据库健康。</li>
 <li>使用一次性server容器执行 <code>pnpm db:migrate:deploy</code> 与 <code>pnpm db:seed</code>；运行时镜像必须包含执行已提交迁移所需依赖。迁移失败不得继续启动新版本。</li>
 <li>交互运行 <code>pnpm bootstrap-admin</code> 创建admin；无默认密码，测试首次改密。</li>
-<li><code>docker compose --env-file .env up -d api worker web</code>；检查API ready、worker心跳、静态资源与HTTPS。</li>
+<li><code>docker compose --env-file .env up -d api worker web</code>；检查API ready、worker心跳及通过公网IP的HTTP访问。HTTP仅用于受限初期访问，后续域名应配置HTTPS。</li>
 <li>按第15节上线检查跑真实记账、权限、提醒及备份恢复；外部服务未通过真通道测试的功能标记未验收。</li>
 </ol>
 <p>命令中的正式scripts和镜像由开发阶段交付，本文不假定它们已经存在。首次上线不自动写入原型演示账目。</p>
@@ -1414,7 +1414,7 @@ server {
 <td>轻量表单、个人付款口径、票据核对／分组、操作者和证据型分析</td>
 </tr>
 </tbody></table>
-<p>上线必须满足：无跨家庭／个人越权；无并发重复有效付款或超额退款；迁移与全量回归通过；生产HTTPS与密钥保护完成；数据库不公网暴露；worker重启恢复和时区正确；真实备份恢复成功；手机主要流程通过；AI真实样本与费用已记录；微信若纳入首版承诺则真绑定、真投递及受限行为通过。若外部条件不满足，回到聊天确认范围，不默默替换已确认功能。</p>
+<p>上线必须满足：无跨家庭／个人越权；无并发重复有效付款或超额退款；迁移与全量回归通过；来源配置与密钥保护完成；数据库不公网暴露；worker重启恢复和时区正确；真实备份恢复成功；手机主要流程通过；AI真实样本与费用已记录；微信若纳入首版承诺则真绑定、真投递及受限行为通过。首阶段按公网IP使用HTTP时，账号密码和会话信息未加密传输，应限制访问来源并避免录入真实敏感账目；正式域名入口应启用HTTPS。若外部条件不满足，回到聊天确认范围，不默默替换已确认功能。</p>
 <p>监控至少覆盖：API错误率、登录失败异常、磁盘容量、数据库连接与备份新鲜度、worker最近心跳、最老待处理job、失败／未知投递、AI失败与费用、证书到期。日志携带requestId、jobId、releaseId，不记录密码、Cookie、原图、share明文token或完整私人账目。</p>
 <h2 id="section-65">16. 待确认项、资料与交付边界</h2><table>
 <thead>

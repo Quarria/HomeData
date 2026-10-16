@@ -53,7 +53,7 @@
 以下事项尚不能视为生产环境已完成：
 
 1. **正式服务器部署验收**：项目已有 Docker Compose、前后端镜像构建文件和 PostgreSQL 服务定义，但尚未在目标云服务器完成构建、部署和端到端验证。
-2. **HTTPS 与域名**：当前 Nginx 配置只监听 HTTP。外网正式使用前需配置 HTTPS 入口、证书签发和续期。
+2. **HTTPS 与域名**：首阶段可使用公网 IP 和 HTTP 访问；HTTP 流量未加密，后续如使用域名或录入真实账目，应配置 HTTPS 入口、证书签发和续期。
 3. **备份与恢复**：尚未完成数据库、票据文件和必要密钥的异地备份及恢复演练，也没有已验证的回滚流程。
 4. **标准 PostgreSQL 验收**：现有测试使用 PGlite；PostgreSQL 18 下的并发退款、并发付款、多 worker 提醒锁和长时间积压恢复仍待验证。
 5. **真实 AI 服务验收**：AI 代码和模拟服务测试已接入；需配置 DeepSeek API Key 后，再用真实票据样本验证识别准确率、费用和数据处理要求。默认 `AI_PROVIDER=disabled`。
@@ -64,16 +64,16 @@
 
 ## 技术路线
 
-| 层次 | 选型 |
-| --- | --- |
-| 前端 | Vue 3、TypeScript、Vite、Vue Router、Pinia |
-| 后端 | Node.js 24、NestJS 12、REST API |
-| 共享数据契约 | `packages/contracts`，使用 Zod 定义与校验请求、响应结构 |
-| 数据库 | PostgreSQL 18（正式环境）；PGlite（本地开发和隔离测试） |
-| ORM 与迁移 | Prisma 7、显式数据库迁移 |
-| 任务处理 | 独立 Node worker，负责提醒与 AI 后台任务 |
-| 测试 | Vitest、PGlite 集成测试、Playwright 浏览器测试 |
-| 部署 | Docker Compose、Nginx；前后端代码同一 Monorepo，运行时为独立服务 |
+| 层次         | 选型                                                             |
+| ------------ | ---------------------------------------------------------------- |
+| 前端         | Vue 3、TypeScript、Vite、Vue Router、Pinia                       |
+| 后端         | Node.js 24、NestJS 12、REST API                                  |
+| 共享数据契约 | `packages/contracts`，使用 Zod 定义与校验请求、响应结构          |
+| 数据库       | PostgreSQL 18（正式环境）；PGlite（本地开发和隔离测试）          |
+| ORM 与迁移   | Prisma 7、显式数据库迁移                                         |
+| 任务处理     | 独立 Node worker，负责提醒与 AI 后台任务                         |
+| 测试         | Vitest、PGlite 集成测试、Playwright 浏览器测试                   |
+| 部署         | Docker Compose、Nginx；前后端代码同一 Monorepo，运行时为独立服务 |
 
 ## 项目结构
 
@@ -124,13 +124,13 @@ pnpm build
 
 ## 部署概览
 
-生产环境使用 PostgreSQL，不使用 PGlite。仓库内 `deploy/compose.yaml` 定义了数据库、一次性迁移、API、worker 和 Web 服务。首次部署前，复制 `deploy/env.example` 为 `deploy/.env` 并填写域名、数据库凭证、会话密钥和加密密钥；AI 保持关闭，除非部署者主动配置服务端模型密钥。
+生产环境使用 PostgreSQL，不使用 PGlite。仓库内 `deploy/compose.yaml` 定义了数据库、一次性迁移、API、worker 和 Web 服务。首次部署前，复制 `deploy/env.example` 为 `deploy/.env` 并填写公网 IP 来源（如 `http://服务器IP:8080`）、数据库凭证、会话密钥和加密密钥；AI 保持关闭，除非部署者主动配置服务端模型密钥。当前可通过 HTTP 按 IP 访问，登录 Cookie 会兼容 HTTP。
 
 示意流程：
 
 ```text
 浏览器 / 手机浏览器
-          │ HTTPS（上线前需配置）
+          │ HTTP + 公网 IP（首阶段）
           ▼
      Nginx / Web ─────► API ─────► PostgreSQL
                           │
@@ -138,7 +138,7 @@ pnpm build
                           └────────► Worker（提醒、AI后台任务）
 ```
 
-当前 Compose 启动会在服务器构建镜像，`HTTP_PORT` 默认映射为 `8080`。服务器资源较小时，可在本地或 CI 构建镜像后再部署。详细步骤、环境变量、数据库模型、接口和验收清单见[开发技术文档](docs/家常账-开发技术文档.md)。
+当前 Compose 启动会在服务器构建镜像，`HTTP_PORT` 默认映射为 `8080`。HTTP 不加密账号密码和会话信息，仅适合受限的初始访问；建议限制防火墙来源，并避免在未加密连接中录入敏感账目信息。服务器资源较小时，可在本地或 CI 构建镜像后再部署。详细步骤、环境变量、数据库模型、接口和验收清单见[开发技术文档](docs/家常账-开发技术文档.md)。
 
 ## 验证记录与说明
 
@@ -157,4 +157,5 @@ pnpm build
 
 - 不要提交 `deploy/.env`、真实数据库凭证、AI API Key、会话密钥、加密密钥、用户票据或数据库目录。
 - `deploy/env.example` 仅包含占位值，部署时需生成并妥善保管真实密钥。
-- 对外开放前必须配置 HTTPS、防火墙和异地备份，并验证恢复流程。
+- HTTP 按公网 IP 访问时，账号密码和会话信息会以明文传输；应限制防火墙来源，避免录入真实敏感账目，并尽早配置 HTTPS。
+- 对外开放前应配置防火墙和异地备份，并验证恢复流程。
