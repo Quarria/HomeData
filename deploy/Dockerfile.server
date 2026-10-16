@@ -1,0 +1,18 @@
+FROM node:24-alpine AS build
+RUN corepack enable && corepack prepare pnpm@11.21.0 --activate
+WORKDIR /app
+COPY . .
+RUN pnpm install --frozen-lockfile && pnpm build
+
+FROM node:24-alpine AS runtime
+ENV NODE_ENV=production
+WORKDIR /app
+RUN addgroup -S homedata && adduser -S homedata -G homedata
+RUN mkdir -p /data/receipts && chown -R homedata:homedata /data/receipts
+COPY --from=build --chown=homedata:homedata /app/package.json /app/pnpm-workspace.yaml /app/pnpm-lock.yaml /app/
+COPY --from=build --chown=homedata:homedata /app/node_modules /app/node_modules
+COPY --from=build --chown=homedata:homedata /app/apps/server /app/apps/server
+COPY --from=build --chown=homedata:homedata /app/packages/contracts /app/packages/contracts
+USER homedata
+WORKDIR /app/apps/server
+CMD ["node", "dist/src/main.js"]

@@ -1,0 +1,28 @@
+{
+  "name": "homedata",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.21.0",
+  "engines": {
+    "node": ">=24.0.0",
+    "pnpm": ">=11.0.0"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @homedata/contracts build && node scripts/dev.mjs",
+    "dev:db": "pnpm --filter @homedata/server dev:db",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "lint": "pnpm -r --if-present lint",
+    "test": "pnpm --filter @homedata/contracts build && pnpm -r --if-present test",
+    "test:integration": "pnpm --filter @homedata/contracts build && pnpm --filter @homedata/server test:integration",
+    "test:e2e": "pnpm --filter @homedata/contracts build && pnpm --filter @homedata/web test:e2e",
+    "build": "pnpm -r --if-present build",
+    "db:migrate:dev": "pnpm --filter @homedata/server db:migrate:dev",
+    "db:migrate:deploy": "pnpm --filter @homedata/server db:migrate:deploy",
+    "db:seed": "pnpm --filter @homedata/server db:seed",
+    "bootstrap-admin": "pnpm --filter @homedata/server bootstrap-admin"
+  },
+  "devDependencies": {
+    "concurrently": "9.2.1",
+    "typescript": "5.9.3"
+  }
+}

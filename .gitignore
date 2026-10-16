@@ -1,0 +1,16 @@
+node_modules/
+node_modules.*/
+.pnpm-store/
+dist/
+coverage/
+playwright-report/
+test-results/
+.env
+.env.*
+!.env.example
+*.log
+data/
+apps/server/prisma/generated/
+.taste-skill/
+deliverables/*.zip
+.DS_Store

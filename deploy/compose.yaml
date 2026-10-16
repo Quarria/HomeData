@@ -1,0 +1,81 @@
+name: homedata
+services:
+  db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD:?Set POSTGRES_APP_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [private]
+
+  migrate:
+    image: ${HOMEDATA_IMAGE:-homedata:latest}
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.server
+    command: ["pnpm", "db:migrate:deploy"]
+    env_file: .env
+    depends_on: { db: { condition: service_healthy } }
+    restart: "no"
+    networks: [private]
+
+  api:
+    image: ${HOMEDATA_IMAGE:-homedata:latest}
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.server
+    command: ["node", "apps/server/dist/src/main.js"]
+    env_file: .env
+    depends_on:
+      {
+        db: { condition: service_healthy },
+        migrate: { condition: service_completed_successfully },
+      }
+    restart: unless-stopped
+    expose: ["3000"]
+    volumes:
+      - receipts:/data/receipts
+    networks: [private]
+
+  worker:
+    image: ${HOMEDATA_IMAGE:-homedata:latest}
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.server
+    command: ["node", "apps/server/dist/worker.js"]
+    env_file: .env
+    depends_on:
+      {
+        db: { condition: service_healthy },
+        migrate: { condition: service_completed_successfully },
+      }
+    restart: unless-stopped
+    volumes:
+      - receipts:/data/receipts
+    networks: [private]
+
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.web
+    restart: unless-stopped
+    depends_on: [api]
+    ports: ["${HTTP_PORT:-8080}:80"]
+    networks: [private]
+
+volumes:
+  postgres_data:
+  receipts:
+networks:
+  private:
+    internal: false

@@ -1,0 +1,48 @@
+{
+  "name": "@homedata/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "dev:db": "tsx scripts/pglite-dev.ts",
+    "worker": "tsx src/worker.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "prettier --check src prisma/seed.ts prisma/migrations scripts tests prisma.config.ts",
+    "test": "vitest run --config vitest.unit.config.ts --pool=threads --maxWorkers=1",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "build": "prisma generate && tsc -p tsconfig.build.json",
+    "db:migrate:dev": "prisma migrate dev",
+    "db:migrate:deploy": "prisma migrate deploy",
+    "db:seed": "tsx prisma/seed.ts",
+    "bootstrap-admin": "tsx cli/bootstrap-admin.ts"
+  },
+  "dependencies": {
+    "@homedata/contracts": "workspace:*",
+    "@nestjs/common": "12.1.3",
+    "@nestjs/core": "12.1.3",
+    "@nestjs/platform-express": "12.1.3",
+    "@prisma/adapter-pg": "7.10.0",
+    "@prisma/client": "7.10.0",
+    "argon2": "0.45.1",
+    "class-transformer": "0.5.1",
+    "class-validator": "0.15.1",
+    "dotenv": "17.2.3",
+    "pg": "8.23.1",
+    "pino": "10.4.0",
+    "reflect-metadata": "0.2.2",
+    "rxjs": "7.8.2",
+    "zod": "4.1.12"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "@types/pg": "8.23.1",
+    "@electric-sql/pglite": "0.5.10",
+    "@electric-sql/pglite-socket": "0.2.13",
+    "prettier": "3.9.10",
+    "prisma": "7.10.0",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "vitest": "5.0.4"
+  }
+}
