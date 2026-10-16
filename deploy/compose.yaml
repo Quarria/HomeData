@@ -52,7 +52,7 @@ services:
     build:
       context: ..
       dockerfile: deploy/Dockerfile.server
-    command: ["node", "dist/worker.js"]
+    command: ["node", "dist/src/worker.js"]
     env_file: runtime.env
     depends_on:
       {
