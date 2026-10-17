@@ -263,30 +263,30 @@ function disableLeavingPage(element: Element) {
         </Transition>
       </header>
       <main class="page-content">
-        <div
-          v-if="activePage !== 'reports' && activePage !== 'home'"
-          class="page-intro"
-        >
-          <h1>{{ activeTitle }}</h1>
-        </div>
-
         <Transition
           name="page"
           mode="out-in"
           @before-leave="disableLeavingPage"
         >
-          <component
-            :is="pageComponents[activePage]"
-            :key="activePage"
-            v-bind="pageProps"
-            @navigate="navigate"
-            @change-password="
-              passwordMode = true;
-              authError = '';
-              passwordNotice = '';
-            "
-            @logout="logout"
-          />
+          <section :key="activePage" class="page-transition-frame">
+            <div
+              v-if="activePage !== 'reports' && activePage !== 'home'"
+              class="page-intro"
+            >
+              <h1>{{ activeTitle }}</h1>
+            </div>
+            <component
+              :is="pageComponents[activePage]"
+              v-bind="pageProps"
+              @navigate="navigate"
+              @change-password="
+                passwordMode = true;
+                authError = '';
+                passwordNotice = '';
+              "
+              @logout="logout"
+            />
+          </section>
         </Transition>
 
         <footer class="page-footer">

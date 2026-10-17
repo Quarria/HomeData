@@ -978,18 +978,37 @@ textarea:focus {
 }
 .page-enter-active {
   transition:
-    opacity 200ms ease,
-    transform 250ms var(--ease-out);
+    opacity 240ms ease,
+    transform 300ms var(--ease-out);
 }
 .page-leave-active {
-  transition: opacity 110ms ease;
+  transition:
+    opacity 140ms ease,
+    transform 170ms var(--ease-out);
 }
 .page-enter-from {
   opacity: 0;
-  transform: translateY(6px);
+  transform: translateY(8px);
 }
 .page-leave-to {
   opacity: 0;
+  transform: translateY(-5px);
+}
+.page-enter-active > .page-intro {
+  animation: page-content-arrive 270ms var(--ease-out) 25ms both;
+}
+.page-enter-active > :not(.page-intro) {
+  animation: page-content-arrive 300ms var(--ease-out) 65ms both;
+}
+@keyframes page-content-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 .first-entry .life-agenda,
 .first-entry .life-capture {
@@ -1090,8 +1109,14 @@ textarea:focus {
   .modal-leave-active .ledger-dialog,
   .modal-enter-active .ledger-dialog > *,
   .popover-enter-active .notification-popover,
-  .popover-leave-active .notification-popover {
+  .popover-leave-active .notification-popover,
+  .page-enter-active,
+  .page-leave-active {
     transition: none;
+  }
+  .page-enter-active > .page-intro,
+  .page-enter-active > :not(.page-intro) {
+    animation: none;
   }
 }
 .task-move,
