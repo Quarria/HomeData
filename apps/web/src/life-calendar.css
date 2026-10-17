@@ -180,12 +180,12 @@ textarea:focus {
 .scope-switch {
   position: relative;
   padding: 4px;
-  border-radius: 24px;
+  border-radius: 12px;
   background: #eee5df;
 }
 .scope-switch button {
   min-height: 34px;
-  border-radius: 20px;
+  border-radius: 9px;
   font-size: 14px;
 }
 .scope-switch button.selected {
@@ -306,7 +306,7 @@ textarea:focus {
 }
 .ledger-origin,
 .segmented-control {
-  border-radius: 25px;
+  border-radius: 12px;
   padding: 4px;
   background: #eee5df;
 }
@@ -317,7 +317,7 @@ textarea:focus {
 }
 .ledger-origin button {
   min-height: 36px;
-  border-radius: 22px;
+  border-radius: 9px;
   font-size: 13px;
 }
 .ledger-origin button.selected {
@@ -385,7 +385,7 @@ textarea:focus {
   z-index: 0;
   top: 4px;
   bottom: 4px;
-  border-radius: 22px;
+  border-radius: 9px;
   background: var(--accent);
   box-shadow: 0 2px 5px rgb(76 41 52 / 14%);
   opacity: 0;
@@ -408,7 +408,7 @@ textarea:focus {
   min-height: 40px;
   padding-inline: 16px;
   border: 0;
-  border-radius: 22px;
+  border-radius: 9px;
   background: transparent;
   color: var(--muted);
   font-size: 13px;
@@ -1572,7 +1572,7 @@ textarea:focus {
   left: 4px;
   width: 56px;
   height: 34px;
-  border-radius: 20px;
+  border-radius: 9px;
   background: var(--accent);
   transition: transform 200ms var(--ease-out);
 }
@@ -1627,7 +1627,7 @@ textarea:focus {
   }
   .reports-period-row {
     display: grid;
-    grid-template-columns: auto 30px minmax(0, 1fr) 30px;
+    grid-template-columns: auto minmax(0, 1fr);
     gap: 6px;
     width: 100%;
   }
@@ -1637,9 +1637,12 @@ textarea:focus {
   .reports-period-row .segmented-control button {
     padding-inline: 10px;
   }
+  .report-period-control {
+    min-width: 0;
+    width: 100%;
+  }
   .report-period-nav {
-    padding: 0;
-    min-width: 30px;
+    flex-basis: 34px;
   }
   .report-date-input {
     width: 100%;

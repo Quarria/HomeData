@@ -692,24 +692,38 @@ onMounted(() => void load());
           class="report-segment"
           @update:model-value="changePeriod"
         />
-        <button class="quiet-button report-period-nav" @click="movePeriod(-1)">
-          ‹
-        </button>
-        <input
-          v-model="periodInput"
-          :type="
-            period === 'day' ? 'date' : period === 'month' ? 'month' : 'number'
-          "
-          :min="period === 'year' ? '2000' : undefined"
-          :max="
-            period === 'year' ? String(new Date().getFullYear()) : undefined
-          "
-          :aria-label="`选择${period === 'day' ? '日期' : period === 'month' ? '月份' : '年份'}`"
-          class="report-date-input"
-        />
-        <button class="quiet-button report-period-nav" @click="movePeriod(1)">
-          ›
-        </button>
+        <div class="report-period-control">
+          <button
+            class="report-period-nav"
+            aria-label="上一个统计周期"
+            @click="movePeriod(-1)"
+          >
+            ‹
+          </button>
+          <input
+            v-model="periodInput"
+            :type="
+              period === 'day'
+                ? 'date'
+                : period === 'month'
+                  ? 'month'
+                  : 'number'
+            "
+            :min="period === 'year' ? '2000' : undefined"
+            :max="
+              period === 'year' ? String(new Date().getFullYear()) : undefined
+            "
+            :aria-label="`选择${period === 'day' ? '日期' : period === 'month' ? '月份' : '年份'}`"
+            class="report-date-input"
+          />
+          <button
+            class="report-period-nav"
+            aria-label="下一个统计周期"
+            @click="movePeriod(1)"
+          >
+            ›
+          </button>
+        </div>
       </div>
       <div class="reports-toolbar-end">
         <SegmentedControl

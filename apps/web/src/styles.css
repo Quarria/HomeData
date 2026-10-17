@@ -2191,6 +2191,7 @@ a {
 .reports-heading,
 .reports-toolbar,
 .reports-period-row,
+.report-period-control,
 .reports-toolbar-end,
 .report-panel-heading {
   display: flex;
@@ -2222,24 +2223,50 @@ a {
   justify-content: flex-start;
   flex-wrap: wrap;
 }
+.report-period-control {
+  display: inline-flex;
+  align-items: center;
+  height: 42px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-deep);
+}
 .reports-toolbar-end {
   justify-content: space-between;
   width: 100%;
 }
 .report-date-input {
-  width: 170px;
-  min-height: 40px;
-  padding: 0 10px;
+  width: 152px;
+  min-width: 0;
+  min-height: 38px;
+  padding: 0 8px;
   border: 0;
   border-radius: 0;
-  background: var(--surface-deep);
+  background: transparent;
   color: var(--ink);
   font-size: 13px;
 }
 .report-period-nav {
-  min-width: 40px;
-  padding: 0 10px;
+  display: inline-grid;
+  flex: 0 0 38px;
+  align-self: stretch;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink);
   font-size: 18px;
+  cursor: pointer;
+}
+.report-period-nav:hover {
+  background: var(--line);
+}
+.report-period-nav:focus-visible,
+.report-date-input:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: -2px;
 }
 .report-family-label {
   padding: 10px 0;
