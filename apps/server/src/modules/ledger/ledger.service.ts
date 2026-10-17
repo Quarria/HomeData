@@ -1170,7 +1170,7 @@ export class LedgerService {
   async audit(
     expenseId: string,
     accountId: string,
-    input: { cursor?: string | undefined; limit: number } = { limit: 30 },
+    input: { cursor?: string | undefined; limit: number } = { limit: 10 },
   ) {
     await this.readExpense(expenseId, accountId);
     const rows = await this.prisma.auditEvent.findMany({

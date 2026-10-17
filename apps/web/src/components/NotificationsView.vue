@@ -41,7 +41,7 @@ async function load(cursor?: string, append = false) {
       items: Message[];
       nextCursor: string | null;
     }>(
-      `/notifications?limit=30${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`,
+      `/notifications?limit=10${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`,
     );
     messages.value = append ? [...messages.value, ...page.items] : page.items;
     nextCursor.value = page.nextCursor;

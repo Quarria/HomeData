@@ -350,7 +350,7 @@ async function loadDetails(
   error.value = "";
   detailsLoading.value = true;
   params.set("cursor", String(cursor));
-  params.set("limit", "30");
+  params.set("limit", "10");
   if (selectedCategoryId.value)
     params.set("categoryId", selectedCategoryId.value);
   if (selectedPayerId.value) params.set("payerId", selectedPayerId.value);
@@ -396,7 +396,7 @@ async function loadShares(cursor?: string, append = false) {
       items: ShareItem[];
       nextCursor: string | null;
     }>(
-      `/shares?limit=30${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`,
+      `/shares?limit=10${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`,
     );
     shareItems.value = append
       ? [...shareItems.value, ...page.items]

@@ -129,7 +129,7 @@ const queryString = computed(() => {
     space: session.activeSpace,
     origin: origin.value,
     deleted: String(deleted.value),
-    limit: "30",
+    limit: "10",
   });
   if (session.activeSpace === "family" && session.family)
     query.set("familyId", session.family.id);
@@ -612,8 +612,13 @@ function displayDate(value: string) {
         <strong
           >{{ sectionLabel
           }}<small v-if="!loading">
-            · {{ nextCursor ? `已加载 ${expenses.length} 笔` : `${expenses.length} 笔` }}</small
-        ></strong
+            ·
+            {{
+              nextCursor
+                ? `已加载 ${expenses.length} 笔`
+                : `${expenses.length} 笔`
+            }}</small
+          ></strong
         ><span>人民币 / CNY</span>
       </div>
       <div v-if="loading" class="ledger-empty">正在读取账本…</div>

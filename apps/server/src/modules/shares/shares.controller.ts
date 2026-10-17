@@ -40,7 +40,7 @@ export class SharesController {
     const input = z
       .object({
         cursor: z.string().uuid().optional(),
-        limit: z.coerce.number().int().min(1).max(100).default(30),
+        limit: z.coerce.number().int().min(1).max(100).default(10),
       })
       .parse(query);
     return apiSuccess(

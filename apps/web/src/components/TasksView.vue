@@ -134,7 +134,7 @@ async function load(cursor?: string, append = false) {
   try {
     const query = new URLSearchParams({
       space: session.activeSpace,
-      limit: "30",
+      limit: "10",
     });
     if (familyId.value) query.set("familyId", familyId.value);
     if (section.value === "tasks") {
@@ -180,7 +180,7 @@ async function loadMoreOccurrences(rule: Rule) {
       items: Occurrence[];
       nextCursor: string | null;
     }>(
-      `/recurring-rules/${rule.id}/occurrences?cursor=${encodeURIComponent(cursor)}&limit=30`,
+      `/recurring-rules/${rule.id}/occurrences?cursor=${encodeURIComponent(cursor)}&limit=10`,
     );
     rule.occurrences.push(...page.items);
     rule.occurrencesNextCursor = page.nextCursor;

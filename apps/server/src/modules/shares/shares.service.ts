@@ -465,7 +465,7 @@ export class SharesService {
 
   async listOwned(
     ownerId: string,
-    input: { cursor?: string | undefined; limit: number } = { limit: 30 },
+    input: { cursor?: string | undefined; limit: number } = { limit: 10 },
   ) {
     const snapshots = await this.prisma.shareSnapshot.findMany({
       where: { ownerId },

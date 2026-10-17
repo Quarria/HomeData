@@ -165,7 +165,7 @@ async function refreshAccounts() {
     const page = await apiRequest<{
       items: AccountSummary[];
       nextCursor: string | null;
-    }>("/admin/accounts?limit=30");
+    }>("/admin/accounts?limit=10");
     accounts.value = page.items;
     accountNextCursor.value = page.nextCursor;
   } catch (reason) {
@@ -181,7 +181,7 @@ async function loadMoreAccounts() {
       items: AccountSummary[];
       nextCursor: string | null;
     }>(
-      `/admin/accounts?limit=30&cursor=${encodeURIComponent(accountNextCursor.value)}`,
+      `/admin/accounts?limit=10&cursor=${encodeURIComponent(accountNextCursor.value)}`,
     );
     accounts.value.push(...page.items);
     accountNextCursor.value = page.nextCursor;

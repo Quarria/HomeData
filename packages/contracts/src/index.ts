@@ -174,7 +174,7 @@ export const expenseListQuerySchema = z.object({
   categoryId: z.string().uuid().optional(),
   q: z.string().trim().max(120).optional(),
   cursor: z.string().uuid().optional(),
-  limit: z.coerce.number().int().min(1).max(100).default(30),
+  limit: z.coerce.number().int().min(1).max(100).default(10),
   deleted: z.enum(["true", "false"]).default("false"),
 });
 
@@ -214,7 +214,7 @@ export const taskListQuerySchema = z.object({
   familyId: z.string().uuid().optional(),
   status: z.enum(["all", "open", "done"]).default("open"),
   cursor: z.string().uuid().optional(),
-  limit: z.coerce.number().int().min(1).max(100).default(30),
+  limit: z.coerce.number().int().min(1).max(100).default(10),
 });
 
 export const reportQuerySchema = z
@@ -257,7 +257,7 @@ export const reportDetailsQuerySchema = reportQuerySchema
     payerId: z.string().uuid().optional(),
     kind: z.enum(["all", "expense", "refund"]).default("all"),
     cursor: z.coerce.number().int().min(0).max(5000).default(0),
-    limit: z.coerce.number().int().min(1).max(100).default(30),
+    limit: z.coerce.number().int().min(1).max(100).default(10),
   });
 
 export const shareCreateRequestSchema = z

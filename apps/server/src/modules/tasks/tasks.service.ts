@@ -601,7 +601,7 @@ export class TasksService implements OnModuleInit, OnModuleDestroy {
   async listOccurrences(
     ruleId: string,
     accountId: string,
-    input: { cursor?: string | undefined; limit: number } = { limit: 30 },
+    input: { cursor?: string | undefined; limit: number } = { limit: 10 },
   ) {
     return this.prisma.$transaction(async (tx) => {
       const rule = await tx.recurringRule.findUnique({
@@ -1048,7 +1048,7 @@ export class TasksService implements OnModuleInit, OnModuleDestroy {
 
   async listNotifications(
     accountId: string,
-    input: { cursor?: string | undefined; limit: number } = { limit: 30 },
+    input: { cursor?: string | undefined; limit: number } = { limit: 10 },
   ) {
     return this.prisma.$transaction(async (tx) => {
       const messages = await tx.inboxMessage.findMany({

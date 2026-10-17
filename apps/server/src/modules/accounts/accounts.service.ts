@@ -24,7 +24,7 @@ export class AccountsService {
   constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
   async list(
-    input: { cursor?: string | undefined; limit: number } = { limit: 30 },
+    input: { cursor?: string | undefined; limit: number } = { limit: 10 },
   ) {
     const accounts = await this.prisma.account.findMany({
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
