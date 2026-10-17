@@ -469,41 +469,46 @@ textarea:focus {
   border-bottom: 1px solid #eee2df;
   border-radius: 7px;
 }
-.ledger-row-list {
+.ledger-list-stage {
   position: relative;
+  min-height: 1px;
 }
 .ledger-results-enter-active,
 .ledger-results-leave-active {
   transition:
-    opacity 230ms ease,
-    transform 320ms var(--ease-out),
-    filter 260ms ease;
+    opacity 280ms ease,
+    transform 360ms var(--ease-out),
+    filter 300ms ease;
 }
 .ledger-results-enter-active .ledger-row {
-  animation: ledger-row-arrive 420ms var(--ease-out) both;
-  animation-delay: var(--row-delay, 0ms);
+  transition:
+    opacity 340ms ease,
+    transform 420ms var(--ease-out),
+    filter 340ms ease;
+  transition-delay: var(--row-delay, 0ms);
+}
+.ledger-results-enter-from .ledger-row {
+  opacity: 0;
+  transform: translateY(16px);
+  filter: blur(3px);
 }
 .ledger-results-enter-from {
   opacity: 0;
-  transform: translateY(20px) scale(0.985);
-  filter: blur(5px);
+  transform: translateY(14px) scale(0.99);
+  filter: blur(4px);
+}
+.ledger-results-leave-active {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 1;
+  pointer-events: none;
 }
 .ledger-results-leave-to {
   opacity: 0;
-  transform: translateY(-12px) scale(0.99);
-  filter: blur(4px);
-}
-@keyframes ledger-row-arrive {
-  from {
-    opacity: 0;
-    transform: translateY(16px);
-    filter: blur(3px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-    filter: blur(0);
-  }
+  transform: translateY(-8px) scale(0.995);
+  filter: blur(3px);
 }
 .ledger-row:nth-of-type(even) {
   background: transparent;
@@ -1153,7 +1158,7 @@ textarea:focus {
     transition: none;
   }
   .ledger-results-enter-active .ledger-row {
-    animation: none;
+    transition: none;
   }
   .page-enter-active > .page-intro,
   .page-enter-active > :not(.page-intro) {
