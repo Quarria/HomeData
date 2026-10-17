@@ -477,10 +477,7 @@ textarea:focus {
   opacity: 0;
   transform: translateY(-8px);
   filter: blur(3px);
-  transition:
-    opacity 180ms ease,
-    transform 220ms var(--ease-out),
-    filter 180ms ease;
+  pointer-events: none;
 }
 .ledger-results-enter-active,
 .ledger-results-leave-active {

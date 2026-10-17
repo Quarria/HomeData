@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from "vue";
+import { computed, nextTick, onMounted, reactive, ref, watch } from "vue";
 import { ApiClientError, apiRequest, newIdempotencyKey } from "../api/client";
 import { useSessionStore } from "../stores/session";
 import AppIcon from "./AppIcon.vue";
@@ -160,6 +160,10 @@ async function load(cursor?: string, append = false) {
     if (!categories.value.length)
       categories.value = await apiRequest<Category[]>("/categories");
     if (loadId !== latestLoadId) return;
+    if (!append && switchingList.value) {
+      await nextTick();
+      if (loadId !== latestLoadId) return;
+    }
     const listData = await apiRequest<{
       items: Expense[];
       nextCursor: string | null;

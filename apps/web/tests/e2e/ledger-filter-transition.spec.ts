@@ -61,6 +61,8 @@ test("fades the previous ledger results while the selected filter loads", async 
   );
   let familyLoadCount = 0;
   let delayNextAllLoad = false;
+  let captureFastFamilyOpacity = false;
+  let opacityAtFastFamilyRequest: number | null = null;
 
   await page.route("**/api/v1/**", async (route) => {
     const url = new URL(route.request().url());
@@ -78,8 +80,15 @@ test("fades the previous ledger results while the selected filter loads", async 
     if (endpoint === "/expenses") {
       const isFamily = url.searchParams.get("origin") === "family";
       if (isFamily) {
-        const delay = familyLoadCount++ === 0 ? 500 : 30;
-        await new Promise((resolve) => setTimeout(resolve, delay));
+        const delay = familyLoadCount++ === 0 ? 500 : 0;
+        if (captureFastFamilyOpacity) {
+          captureFastFamilyOpacity = false;
+          opacityAtFastFamilyRequest = await page
+            .locator(".ledger-row-list")
+            .first()
+            .evaluate((element) => Number(getComputedStyle(element).opacity));
+        }
+        if (delay) await new Promise((resolve) => setTimeout(resolve, delay));
       } else if (delayNextAllLoad) {
         delayNextAllLoad = false;
         await new Promise((resolve) => setTimeout(resolve, 400));
@@ -113,10 +122,13 @@ test("fades the previous ledger results while the selected filter loads", async 
     .locator(".ledger-origin")
     .getByRole("button", { name: "全部", exact: true })
     .click();
+  captureFastFamilyOpacity = true;
   await page
     .locator(".ledger-origin")
     .getByRole("button", { name: "家庭费用", exact: true })
     .click();
+  await expect.poll(() => opacityAtFastFamilyRequest).not.toBeNull();
+  expect(opacityAtFastFamilyRequest).toBe(0);
   await expect(page.locator(".ledger-row")).toHaveCount(4);
   await page.waitForTimeout(450);
   await expect(page.locator(".ledger-row")).toHaveCount(4);
