@@ -1,0 +1,72 @@
+[
+  {
+    "file": "page-ledger.png",
+    "state": null,
+    "size": "390x844",
+    "zoom": 1,
+    "group": "ledger",
+    "animationWaitMs": 240,
+    "issues": [],
+    "lint": [
+      {
+        "rule": "contrastLow",
+        "label": "文字对比度不达标（正文低于 4.5:1，大字低于 3:1）",
+        "count": 2,
+        "examples": [
+          "button.active「个人」（1.24:1）",
+          "button.active「全部」（1.24:1）"
+        ]
+      }
+    ]
+  },
+  {
+    "file": "page-tasks.png",
+    "state": null,
+    "size": "390x844",
+    "zoom": 1,
+    "group": "tasks",
+    "animationWaitMs": 239,
+    "issues": [],
+    "lint": [
+      {
+        "rule": "contrastLow",
+        "label": "文字对比度不达标（正文低于 4.5:1，大字低于 3:1）",
+        "count": 1,
+        "examples": [
+          "button.active「个人」（1.24:1）"
+        ]
+      }
+    ]
+  },
+  {
+    "file": "page-reports.png",
+    "state": null,
+    "size": "390x844",
+    "zoom": 1,
+    "group": "reports",
+    "animationWaitMs": 234,
+    "issues": [],
+    "lint": [
+      {
+        "rule": "contrastLow",
+        "label": "文字对比度不达标（正文低于 4.5:1，大字低于 3:1）",
+        "count": 3,
+        "examples": [
+          "button.active「个人」（1.24:1）",
+          "button.active「全部」（1.24:1）",
+          "button.active「净支出」（1.24:1）"
+        ]
+      }
+    ]
+  },
+  {
+    "file": "page-profile.png",
+    "state": null,
+    "size": "390x844",
+    "zoom": 1,
+    "group": "profile",
+    "animationWaitMs": 232,
+    "issues": [],
+    "lint": []
+  }
+]

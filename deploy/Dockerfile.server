@@ -1,8 +1,14 @@
+# syntax=docker/dockerfile:1
 FROM node:24-alpine AS build
 RUN corepack enable && corepack prepare pnpm@11.21.0 --activate
 WORKDIR /app
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
+COPY apps/server/package.json apps/server/package.json
+COPY apps/web/package.json apps/web/package.json
+COPY packages/contracts/package.json packages/contracts/package.json
+RUN --mount=type=cache,id=homedata-pnpm-store-v11,target=/root/.local/share/pnpm/store/v11,sharing=locked pnpm install --frozen-lockfile
 COPY . .
-RUN pnpm install --frozen-lockfile && pnpm build
+RUN pnpm build
 
 FROM node:24-alpine AS runtime
 ENV NODE_ENV=production

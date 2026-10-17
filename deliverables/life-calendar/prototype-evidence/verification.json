@@ -1,0 +1,38 @@
+[
+  {
+    "viewport": 1440,
+    "pages": 5,
+    "captureAndTotal": "passed",
+    "refreshResetsDemo": "passed",
+    "completeTask": "passed",
+    "reducedMotion": "passed",
+    "errors": []
+  },
+  {
+    "viewport": 768,
+    "pages": 5,
+    "captureAndTotal": "passed",
+    "refreshResetsDemo": "passed",
+    "completeTask": "passed",
+    "reducedMotion": "passed",
+    "errors": []
+  },
+  {
+    "viewport": 390,
+    "pages": 5,
+    "captureAndTotal": "passed",
+    "refreshResetsDemo": "passed",
+    "completeTask": "passed",
+    "reducedMotion": "passed",
+    "errors": []
+  },
+  {
+    "viewport": 320,
+    "pages": 5,
+    "captureAndTotal": "passed",
+    "refreshResetsDemo": "passed",
+    "completeTask": "passed",
+    "reducedMotion": "passed",
+    "errors": []
+  }
+]
