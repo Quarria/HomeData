@@ -92,6 +92,12 @@ function today() {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 }
+function dueRuleLabel(rule: Rule) {
+  const date = new Date(`${rule.anchorOn}T00:00:00`);
+  return rule.frequency === "MONTHLY"
+    ? `每月 ${date.getDate()} 日到期`
+    : `每年 ${date.getMonth() + 1} 月 ${date.getDate()} 日到期`;
+}
 const familyId = computed(() =>
   session.activeSpace === "family" ? session.family?.id : undefined,
 );
@@ -461,9 +467,8 @@ async function payOccurrence() {
               >
               <h3>{{ rule.title }}</h3>
               <p>
-                {{
-                  rule.expectedAmount ? `预计 ¥${rule.expectedAmount} · ` : ""
-                }}提醒日期 {{ rule.anchorOn }}
+                {{ rule.expectedAmount ? `预计 ¥${rule.expectedAmount} · ` : ""
+                }}{{ dueRuleLabel(rule) }}
               </p>
             </div>
             <span class="rule-status" :class="rule.status.toLowerCase()">{{
@@ -507,7 +512,9 @@ async function payOccurrence() {
               </div>
             </div>
           </div>
-          <div v-else class="no-occurrence">期次将在提醒时间到达时生成。</div>
+          <div v-else class="no-occurrence">
+            期次会在个人提醒设置的提前日期生成；实际到期日按上方周期规则计算。
+          </div>
           <footer v-if="rule.canManage">
             <button class="quiet-button" @click="openRule(rule)">
               编辑规则</button
@@ -650,9 +657,16 @@ async function payOccurrence() {
                 <option value="YEARLY">每年</option>
               </select></label
             ><label
-              >提醒日期<input v-model="ruleForm.anchorOn" type="date" required
+              >首次到期日<input
+                v-model="ruleForm.anchorOn"
+                type="date"
+                required
             /></label>
           </div>
+          <p class="fixed-reminder-help">
+            后续到期日按所选周期重复计算。提醒时间和提前天数由「我的 ·
+            提醒设置」控制，到期当天也会提醒。
+          </p>
           <label
             >预计金额（可选）<input
               v-model="ruleForm.expectedAmount"

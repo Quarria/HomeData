@@ -244,6 +244,10 @@ export const reportQuerySchema = z
     },
   );
 
+export const reportTrendQuerySchema = reportQuerySchema.safeExtend({
+  categoryId: z.string().uuid().optional(),
+});
+
 export const reportDetailsQuerySchema = reportQuerySchema
   .omit({ granularity: true, basis: true })
   .extend({

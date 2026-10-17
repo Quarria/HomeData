@@ -1917,8 +1917,14 @@ a {
   gap: 3px;
 }
 .occurrence-actions .quiet-button {
-  padding: 6px 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 88px;
+  min-height: 36px;
+  padding: 0 12px;
   font-size: 13px;
+  white-space: nowrap;
 }
 .no-occurrence {
   padding: 14px 0 5px;
@@ -1928,8 +1934,24 @@ a {
 .fixed-card > footer {
   display: flex;
   justify-content: flex-end;
-  gap: 4px;
+  gap: 8px;
   padding-top: 9px;
+}
+.fixed-card > footer .quiet-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 88px;
+  min-height: 36px;
+  padding: 0 12px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.fixed-reminder-help {
+  margin: -2px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
 }
 .empty-state {
   display: grid;

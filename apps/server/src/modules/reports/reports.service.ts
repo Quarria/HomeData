@@ -184,10 +184,14 @@ export class ReportsService {
     };
   }
 
-  async trend(accountId: string, input: ReportQuery) {
+  async trend(
+    accountId: string,
+    input: ReportQuery & { categoryId?: string | undefined },
+  ) {
     const access = await this.accessWhere(accountId, input);
     const where: Prisma.ExpenseWhereInput = {
       ...access,
+      ...(input.categoryId ? { categoryId: input.categoryId } : {}),
       deletedAt: null,
       occurredOn: this.rangeWhere(input),
     };
@@ -200,7 +204,13 @@ export class ReportsService {
       where: {
         deletedAt: null,
         occurredOn: this.rangeWhere(input),
-        expense: { is: { ...access, deletedAt: null } },
+        expense: {
+          is: {
+            ...access,
+            ...(input.categoryId ? { categoryId: input.categoryId } : {}),
+            deletedAt: null,
+          },
+        },
       },
       select: { occurredOn: true, amountCents: true },
     });

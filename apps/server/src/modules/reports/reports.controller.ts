@@ -2,6 +2,7 @@ import { Controller, Get, Inject, Query, Req } from "@nestjs/common";
 import {
   reportDetailsQuerySchema,
   reportQuerySchema,
+  reportTrendQuerySchema,
 } from "@homedata/contracts";
 import type { AuthenticatedRequest } from "../../shared/auth/auth-types.js";
 import { apiSuccess, parseBody } from "../../shared/http/api-response.js";
@@ -30,7 +31,7 @@ export class ReportsController {
     @Query() query: Record<string, unknown>,
     @Req() request: AuthenticatedRequest,
   ) {
-    const input = parseBody(reportQuerySchema, query);
+    const input = parseBody(reportTrendQuerySchema, query);
     return apiSuccess(
       request,
       await this.reports.trend(request.account!.id, input),

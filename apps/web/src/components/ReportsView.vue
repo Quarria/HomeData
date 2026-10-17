@@ -218,6 +218,16 @@ const chart = computed(() => {
     points: coords.flatMap(([x, pointY]) => [x, pointY]),
   };
 });
+const selectedCategory = computed(() =>
+  categories.value.find((item) => item.categoryId === selectedCategoryId.value),
+);
+const trendHasData = computed(() =>
+  selectedCategory.value
+    ? points.value.some(
+        (point) => Number(point.expense) !== 0 || Number(point.refund) !== 0,
+      )
+    : Boolean(summary.value?.hasData),
+);
 const chartDots = computed(() => {
   const values = chart.value.points;
   return values.flatMap((value, index) =>
@@ -260,9 +270,12 @@ async function load() {
   error.value = "";
   try {
     const params = query.value.toString();
+    const trendParams = new URLSearchParams(params);
+    if (selectedCategoryId.value)
+      trendParams.set("categoryId", selectedCategoryId.value);
     const [nextSummary, nextTrend, nextCategories] = await Promise.all([
       apiRequest<Summary>(`/reports/summary?${params}`),
-      apiRequest<{ points: Point[] }>(`/reports/trend?${params}`),
+      apiRequest<{ points: Point[] }>(`/reports/trend?${trendParams}`),
       apiRequest<Category[]>(`/reports/categories?${params}`),
     ]);
     const nextMembers =
@@ -721,10 +734,17 @@ onMounted(() => void load());
               <h3>支出趋势</h3>
               <small>{{ range.from }} 至 {{ range.to }}</small>
             </div>
-            <span>{{ basis === "net" ? "净支出" : "原始支出" }}</span>
+            <span>
+              {{ selectedCategory ? `${selectedCategory.name} · ` : ""
+              }}{{ basis === "net" ? "净支出" : "原始支出" }}
+            </span>
           </header>
-          <div v-if="!summary.hasData" class="report-empty">
-            这个周期还没有支出记录。
+          <div v-if="!trendHasData" class="report-empty">
+            {{
+              selectedCategory
+                ? `这个周期没有${selectedCategory.name}记录。`
+                : "这个周期还没有支出记录。"
+            }}
           </div>
           <div v-else class="report-chart-wrap">
             <svg
@@ -777,7 +797,13 @@ onMounted(() => void load());
             </button>
           </div>
           <div v-else class="report-empty">暂无分类数据。</div>
-          <p class="report-panel-note">点击分类查看对应明细。</p>
+          <p class="report-panel-note">
+            {{
+              selectedCategory
+                ? `趋势和明细已按${selectedCategory.name}筛选。`
+                : "点击分类后，趋势和明细会同步筛选。"
+            }}
+          </p>
         </section>
       </div>
 
