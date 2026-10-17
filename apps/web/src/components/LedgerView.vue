@@ -78,6 +78,7 @@ const originOptions = [
 ];
 const categories = ref<Category[]>([]);
 const expenses = ref<Expense[]>([]);
+const listTransitionKey = ref(0);
 const loading = ref(false);
 const loadingMore = ref(false);
 const nextCursor = ref<string | null>(null);
@@ -162,6 +163,7 @@ async function load(cursor?: string, append = false) {
       ? [...expenses.value, ...listData.items]
       : listData.items;
     nextCursor.value = listData.nextCursor;
+    if (!append) listTransitionKey.value += 1;
   } catch (reason) {
     error.value =
       reason instanceof ApiClientError ? reason.message : "账本暂时无法加载。";
@@ -627,48 +629,54 @@ function displayDate(value: string) {
           deleted ? "回收站暂时为空。" : "这里还没有记录，从一笔日常开支开始。"
         }}
       </div>
-      <TransitionGroup name="ledger-list" tag="div" class="ledger-row-list">
-        <button
-          v-for="(item, index) in expenses"
-          :key="item.id"
-          class="ledger-row"
-          :style="{ '--row-delay': `${Math.min(index * 22, 180)}ms` }"
-          @click="openDetails(item.id)"
+      <Transition name="ledger-results" mode="out-in">
+        <div
+          :key="listTransitionKey"
+          class="ledger-row-list"
+          :aria-busy="loading"
         >
-          <span class="ledger-row-mark"
-            ><AppIcon name="ledger" :size="18"
-          /></span>
-          <span class="ledger-row-title"
-            ><strong>{{ item.title }}</strong
-            ><small
-              >{{ displayDate(item.occurredOn) }} ·
-              {{ item.familyId ? "家庭费用" : "个人费用"
-              }}<template v-if="item.deletedAt">
-                ·
-                {{
-                  new Date(item.purgeAfter ?? "").toLocaleDateString("zh-CN")
-                }}
-                前可恢复</template
-              ></small
-            ></span
+          <button
+            v-for="(item, index) in expenses"
+            :key="item.id"
+            class="ledger-row"
+            :style="{ '--row-delay': `${Math.min(index * 45, 300)}ms` }"
+            @click="openDetails(item.id)"
           >
-          <span class="ledger-row-category">{{ item.category.name }}</span>
-          <span class="ledger-row-payer">{{ item.payer.nickname }}</span>
-          <span
-            class="ledger-row-amount"
-            :class="{ refunded: Number(item.refund) > 0 }"
-            >¥{{ money(item.net)
-            }}<small v-if="Number(item.refund) > 0"
-              >支出 ¥{{ money(item.amount) }} · 退 ¥{{
-                money(item.refund)
-              }}</small
-            ></span
-          >
-          <span class="ledger-row-detail"
-            >{{ deleted ? "恢复" : "详情" }} ›</span
-          >
-        </button>
-      </TransitionGroup>
+            <span class="ledger-row-mark"
+              ><AppIcon name="ledger" :size="18"
+            /></span>
+            <span class="ledger-row-title"
+              ><strong>{{ item.title }}</strong
+              ><small
+                >{{ displayDate(item.occurredOn) }} ·
+                {{ item.familyId ? "家庭费用" : "个人费用"
+                }}<template v-if="item.deletedAt">
+                  ·
+                  {{
+                    new Date(item.purgeAfter ?? "").toLocaleDateString("zh-CN")
+                  }}
+                  前可恢复</template
+                ></small
+              ></span
+            >
+            <span class="ledger-row-category">{{ item.category.name }}</span>
+            <span class="ledger-row-payer">{{ item.payer.nickname }}</span>
+            <span
+              class="ledger-row-amount"
+              :class="{ refunded: Number(item.refund) > 0 }"
+              >¥{{ money(item.net)
+              }}<small v-if="Number(item.refund) > 0"
+                >支出 ¥{{ money(item.amount) }} · 退 ¥{{
+                  money(item.refund)
+                }}</small
+              ></span
+            >
+            <span class="ledger-row-detail"
+              >{{ deleted ? "恢复" : "详情" }} ›</span
+            >
+          </button>
+        </div>
+      </Transition>
       <button
         v-if="nextCursor && !loading"
         class="quiet-button ledger-load-more"
