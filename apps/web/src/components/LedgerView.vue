@@ -79,6 +79,8 @@ const originOptions = [
 const categories = ref<Category[]>([]);
 const expenses = ref<Expense[]>([]);
 const listTransitionKey = ref(0);
+const switchingList = ref(false);
+let latestLoadId = 0;
 const loading = ref(false);
 const loadingMore = ref(false);
 const nextCursor = ref<string | null>(null);
@@ -144,32 +146,44 @@ const sectionLabel = computed(() =>
 );
 
 async function load(cursor?: string, append = false) {
+  const loadId = ++latestLoadId;
+  const requestedQuery = queryString.value;
   if (append) loadingMore.value = true;
   else {
     loading.value = true;
+    loadingMore.value = false;
+    switchingList.value = expenses.value.length > 0;
     nextCursor.value = null;
   }
   error.value = "";
   try {
     if (!categories.value.length)
       categories.value = await apiRequest<Category[]>("/categories");
+    if (loadId !== latestLoadId) return;
     const listData = await apiRequest<{
       items: Expense[];
       nextCursor: string | null;
     }>(
-      `/expenses?${queryString.value}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`,
+      `/expenses?${requestedQuery}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`,
     );
+    if (loadId !== latestLoadId) return;
     expenses.value = append
       ? [...expenses.value, ...listData.items]
       : listData.items;
     nextCursor.value = listData.nextCursor;
     if (!append) listTransitionKey.value += 1;
   } catch (reason) {
-    error.value =
-      reason instanceof ApiClientError ? reason.message : "账本暂时无法加载。";
+    if (loadId === latestLoadId)
+      error.value =
+        reason instanceof ApiClientError
+          ? reason.message
+          : "账本暂时无法加载。";
   } finally {
-    loading.value = false;
-    loadingMore.value = false;
+    if (loadId === latestLoadId) {
+      loading.value = false;
+      loadingMore.value = false;
+      switchingList.value = false;
+    }
   }
 }
 
@@ -633,7 +647,7 @@ function displayDate(value: string) {
         <Transition name="ledger-results">
           <div
             :key="listTransitionKey"
-            class="ledger-row-list"
+            :class="['ledger-row-list', { 'is-switching': switchingList }]"
             :aria-busy="loading"
           >
             <button
