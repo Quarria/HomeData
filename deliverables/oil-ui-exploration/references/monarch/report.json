@@ -1,0 +1,51 @@
+[
+  {
+    "file": "page.png",
+    "state": null,
+    "size": "1440x900",
+    "zoom": 1,
+    "animationWaitMs": 0,
+    "issues": [],
+    "lint": [
+      {
+        "rule": "eyebrow",
+        "label": "标题上方的眉标",
+        "count": 9,
+        "examples": [
+          "p.eyebrow「WHAT IS MONARCH?」",
+          "p.eyebrow「NET WORTH」",
+          "p.eyebrow「TRANSACTIONS」"
+        ]
+      },
+      {
+        "rule": "contrastLow",
+        "label": "文字对比度不达标（正文低于 4.5:1，大字低于 3:1）",
+        "count": 8,
+        "examples": [
+          "a.inline-flex.items-center「Sign up」（2.96:1）",
+          "a.inline-flex.items-center「Unlock better money habi」（2.96:1）",
+          "p.eyebrow「NET WORTH」（3.19:1）"
+        ]
+      },
+      {
+        "rule": "longMeasure",
+        "label": "正文行太长",
+        "count": 2,
+        "examples": [
+          "p「Monarch simplifies finan」（每行约 101 个字符）",
+          "p「Connect your accounts an」（每行约 99 个字符）"
+        ]
+      },
+      {
+        "rule": "tightLeading",
+        "label": "多行正文行高过紧",
+        "count": 7,
+        "examples": [
+          "h3.as-h3「\"Monarch Money is the be」（1.20）",
+          "h3.as-h3「\"I looked at Monarch Mon」（1.20）",
+          "h3.as-h3「\"It’s like if someone to」（1.20）"
+        ]
+      }
+    ]
+  }
+]

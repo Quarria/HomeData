@@ -1,0 +1,35 @@
+[
+  {
+    "file": "page.png",
+    "state": null,
+    "size": "1440x900",
+    "zoom": 1,
+    "animationWaitMs": 0,
+    "issues": [
+      "加载错误：Error: <svg> attribute height: Expected length, \"auto\". https://www.ynab.com/",
+      "加载错误：Error: <svg> attribute height: Expected length, \"auto\". https://www.ynab.com/",
+      "加载错误：Error: <svg> attribute height: Expected length, \"auto\". https://www.ynab.com/",
+      "加载错误：Error: <svg> attribute height: Expected length, \"auto\". https://www.ynab.com/"
+    ],
+    "lint": [
+      {
+        "rule": "tightLeading",
+        "label": "多行正文行高过紧",
+        "count": 3,
+        "examples": [
+          "p.hero_subhead「Get YNAB. Get good at mo」（1.25）",
+          "span.text-style-highlight-blurple「“How you spend your mone」（1.25）",
+          "h2「The average user saves $」（1.10）"
+        ]
+      },
+      {
+        "rule": "smallText",
+        "label": "正文小于 13px",
+        "count": 1,
+        "examples": [
+          "em「YNAB is an agent of Plai」（12px）"
+        ]
+      }
+    ]
+  }
+]

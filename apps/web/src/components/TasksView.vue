@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from "vue";
+import { computed, nextTick, onMounted, reactive, ref, watch } from "vue";
 import {
   ApiClientError,
   apiRequest,
@@ -53,8 +53,11 @@ type Rule = {
 };
 type Category = { id: string; code: string; name: string };
 
+const props = defineProps<{ initialAction?: string; targetId?: string }>();
 const session = useSessionStore();
-const section = ref<"tasks" | "fixed">("tasks");
+const section = ref<"tasks" | "fixed">(
+  ["pay", "fixed"].includes(props.initialAction ?? "") ? "fixed" : "tasks",
+);
 const tasks = ref<Task[]>([]);
 const rules = ref<Rule[]>([]);
 const categories = ref<Category[]>([]);
@@ -125,7 +128,22 @@ watch(
   [section, statusFilter, familyId, () => session.activeSpace],
   () => void load(),
 );
-onMounted(() => void load());
+onMounted(async () => {
+  await load();
+  if (props.initialAction === "create") openTask();
+  if (props.initialAction === "pay" && canWrite.value) {
+    const target = rules.value
+      .flatMap((rule) => rule.occurrences)
+      .find((item) => item.id === props.targetId);
+    if (target?.status === "PENDING") openPayment(target);
+  }
+  if (props.initialAction === "view" && props.targetId) {
+    await nextTick();
+    const target = document.getElementById(`task-${props.targetId}`);
+    target?.focus({ preventScroll: true });
+    target?.scrollIntoView({ block: "nearest", behavior: "instant" });
+  }
+});
 
 function openTask(task?: Task) {
   taskEditing.value = task ?? null;
@@ -177,7 +195,10 @@ async function saveTask() {
 async function completeTask(task: Task) {
   try {
     await postJson(`/tasks/${task.id}/complete`, { version: task.version });
-    notice.value = "已完成，全家成员会看到最新状态。";
+    notice.value =
+      session.activeSpace === "family"
+        ? "已完成，家庭成员会看到最新状态。"
+        : "已完成，停止提醒。";
     await load();
   } catch (reason) {
     error.value = explain(reason, "操作失败，请刷新后重试。");
@@ -354,14 +375,18 @@ async function payOccurrence() {
       {{ notice }} <button @click="notice = ''" aria-label="关闭提示">×</button>
     </p>
     <p v-if="error" class="inline-error" role="alert">{{ error }}</p>
-    <div v-if="loading" class="empty-state">正在加载…</div>
+    <div v-if="loading && !tasks.length && !rules.length" class="empty-state">
+      正在加载…
+    </div>
 
     <template v-else-if="section === 'tasks'">
-      <div v-if="tasks.length" class="task-list">
+      <TransitionGroup name="task" tag="div" class="task-list">
         <article
           v-for="task in tasks"
           :key="task.id"
           class="task-row"
+          :id="`task-${task.id}`"
+          tabindex="-1"
           :class="{ completed: task.status === 'DONE' }"
         >
           <button
@@ -407,8 +432,8 @@ async function payOccurrence() {
             </button>
           </div>
         </article>
-      </div>
-      <div v-else class="empty-state">
+      </TransitionGroup>
+      <div v-if="!tasks.length" class="empty-state">
         <span class="empty-symbol">◷</span
         ><strong>{{
           statusFilter === "done" ? "还没有完成的待办" : "今天没有待办"
@@ -498,183 +523,197 @@ async function payOccurrence() {
       </div>
     </template>
 
-    <div
-      v-if="taskDialog"
-      class="ledger-overlay"
-      @click.self="taskDialog = false"
-    >
-      <form class="ledger-dialog" @submit.prevent="saveTask">
-        <header class="ledger-dialog-header">
-          <div>
-            <span class="eyebrow">{{
-              taskEditing ? "EDIT TASK" : "NEW TASK"
-            }}</span>
-            <h2>{{ taskEditing ? "编辑待办" : "新建待办" }}</h2>
-          </div>
-          <button
-            type="button"
-            class="dialog-close"
-            aria-label="关闭弹窗"
-            @click="taskDialog = false"
-          >
-            ×
-          </button>
-        </header>
-        <label
-          >事项名称<input
-            v-model="taskForm.title"
-            required
-            maxlength="120"
-            placeholder="例如：缴纳水费" /></label
-        ><label
-          >截止日期<input
-            v-model="taskForm.dueOn"
-            type="date"
-            required /></label
-        ><label
-          >补充说明<textarea
-            v-model="taskForm.description"
-            maxlength="500"
-            rows="3"
-          /></label
-        ><label v-if="session.activeSpace === 'family' && session.family"
-          >负责人<select v-model="taskForm.assigneeId">
-            <option value="">暂不指定</option>
-            <option
-              v-for="person in session.family.members"
-              :key="person.id"
-              :value="person.id"
+    <Transition name="modal"
+      ><div
+        v-if="taskDialog"
+        class="ledger-overlay"
+        v-dialog
+        @click.self="taskDialog = false"
+      >
+        <form class="ledger-dialog" @submit.prevent="saveTask">
+          <header class="ledger-dialog-header">
+            <div>
+              <span class="eyebrow">{{
+                taskEditing ? "更新事项" : "日常提醒"
+              }}</span>
+              <h2>{{ taskEditing ? "编辑待办" : "新建待办" }}</h2>
+            </div>
+            <button
+              type="button"
+              class="dialog-close"
+              aria-label="关闭弹窗"
+              @click="taskDialog = false"
             >
-              {{ person.nickname }}
-            </option>
-          </select></label
-        >
-        <div class="ledger-dialog-actions">
-          <button
-            type="button"
-            class="quiet-button"
-            @click="taskDialog = false"
-          >
-            取消</button
-          ><button class="primary-button" :disabled="saving">
-            {{ saving ? "保存中…" : "保存待办" }}
-          </button>
-        </div>
-      </form>
-    </div>
-
-    <div
-      v-if="ruleDialog"
-      class="ledger-overlay"
-      @click.self="ruleDialog = false"
-    >
-      <form class="ledger-dialog" @submit.prevent="saveRule">
-        <header class="ledger-dialog-header">
-          <div>
-            <span class="eyebrow">{{
-              ruleEditing ? "EDIT RECURRING" : "NEW RECURRING"
-            }}</span>
-            <h2>{{ ruleEditing ? "编辑固定费用" : "添加固定费用" }}</h2>
-          </div>
-          <button
-            type="button"
-            class="dialog-close"
-            aria-label="关闭弹窗"
-            @click="ruleDialog = false"
-          >
-            ×
-          </button>
-        </header>
-        <label
-          >费用名称<input
-            v-model="ruleForm.title"
-            required
-            maxlength="120"
-            placeholder="例如：每月电费" /></label
-        ><label
-          >分类<select v-model="ruleForm.categoryId" required>
-            <option
-              v-for="category in categories"
-              :key="category.id"
-              :value="category.id"
-            >
-              {{ category.name }}
-            </option>
-          </select></label
-        >
-        <div class="form-grid">
+              ×
+            </button>
+          </header>
           <label
-            >周期<select v-model="ruleForm.frequency">
-              <option value="MONTHLY">每月</option>
-              <option value="YEARLY">每年</option>
-            </select></label
+            >事项名称<input
+              v-model="taskForm.title"
+              required
+              maxlength="120"
+              placeholder="例如：缴纳水费" /></label
           ><label
-            >提醒日期<input v-model="ruleForm.anchorOn" type="date" required
-          /></label>
-        </div>
-        <label
-          >预计金额（可选）<input
-            v-model="ruleForm.expectedAmount"
-            inputmode="decimal"
-            placeholder="0.00"
-        /></label>
-        <div class="ledger-dialog-actions">
-          <button
-            type="button"
-            class="quiet-button"
-            @click="ruleDialog = false"
+            >截止日期<input
+              v-model="taskForm.dueOn"
+              type="date"
+              required /></label
+          ><label
+            >补充说明<textarea
+              v-model="taskForm.description"
+              maxlength="500"
+              rows="3"
+            /></label
+          ><label v-if="session.activeSpace === 'family' && session.family"
+            >负责人<select v-model="taskForm.assigneeId">
+              <option value="">暂不指定</option>
+              <option
+                v-for="person in session.family.members"
+                :key="person.id"
+                :value="person.id"
+              >
+                {{ person.nickname }}
+              </option>
+            </select></label
           >
-            取消</button
-          ><button class="primary-button" :disabled="saving">保存规则</button>
-        </div>
-      </form>
-    </div>
-
-    <div
-      v-if="paymentTarget"
-      class="ledger-overlay"
-      @click.self="paymentTarget = null"
-    >
-      <form class="ledger-dialog" @submit.prevent="payOccurrence">
-        <header class="ledger-dialog-header">
-          <div>
-            <span class="eyebrow">PAYMENT · {{ paymentTarget.periodKey }}</span>
-            <h2>确认本期付款</h2>
+          <div class="ledger-dialog-actions">
+            <button
+              type="button"
+              class="quiet-button"
+              @click="taskDialog = false"
+            >
+              取消</button
+            ><button class="primary-button" :disabled="saving">
+              {{ saving ? "保存中…" : "保存待办" }}
+            </button>
           </div>
-          <button
-            type="button"
-            class="dialog-close"
-            aria-label="关闭弹窗"
-            @click="paymentTarget = null"
+        </form>
+      </div></Transition
+    >
+
+    <Transition name="modal"
+      ><div
+        v-if="ruleDialog"
+        class="ledger-overlay"
+        v-dialog
+        @click.self="ruleDialog = false"
+      >
+        <form class="ledger-dialog" @submit.prevent="saveRule">
+          <header class="ledger-dialog-header">
+            <div>
+              <span class="eyebrow">{{
+                ruleEditing ? "更新周期" : "周期提醒"
+              }}</span>
+              <h2>{{ ruleEditing ? "编辑固定费用" : "添加固定费用" }}</h2>
+            </div>
+            <button
+              type="button"
+              class="dialog-close"
+              aria-label="关闭弹窗"
+              @click="ruleDialog = false"
+            >
+              ×
+            </button>
+          </header>
+          <label
+            >费用名称<input
+              v-model="ruleForm.title"
+              required
+              maxlength="120"
+              placeholder="例如：每月电费" /></label
+          ><label
+            >分类<select v-model="ruleForm.categoryId" required>
+              <option
+                v-for="category in categories"
+                :key="category.id"
+                :value="category.id"
+              >
+                {{ category.name }}
+              </option>
+            </select></label
           >
-            ×
-          </button>
-        </header>
-        <p class="payment-hint">
-          确认后会创建一笔支出并进入账本，付款人记录为当前账号。
-        </p>
-        <label
-          >实际金额<input
-            v-model="paymentForm.amount"
-            inputmode="decimal"
-            required
-            pattern="(?:0|[1-9]\d{0,8})(?:\.\d{1,2})?"
-            placeholder="0.00" /></label
-        ><label
-          >付款日期<input v-model="paymentForm.occurredOn" type="date" required
-        /></label>
-        <div class="ledger-dialog-actions">
-          <button
-            type="button"
-            class="quiet-button"
-            @click="paymentTarget = null"
-          >
-            取消</button
-          ><button class="primary-button" :disabled="saving">
-            {{ saving ? "提交中…" : "确认付款并记账" }}
-          </button>
-        </div>
-      </form>
-    </div>
+          <div class="form-grid">
+            <label
+              >周期<select v-model="ruleForm.frequency">
+                <option value="MONTHLY">每月</option>
+                <option value="YEARLY">每年</option>
+              </select></label
+            ><label
+              >提醒日期<input v-model="ruleForm.anchorOn" type="date" required
+            /></label>
+          </div>
+          <label
+            >预计金额（可选）<input
+              v-model="ruleForm.expectedAmount"
+              inputmode="decimal"
+              placeholder="0.00"
+          /></label>
+          <div class="ledger-dialog-actions">
+            <button
+              type="button"
+              class="quiet-button"
+              @click="ruleDialog = false"
+            >
+              取消</button
+            ><button class="primary-button" :disabled="saving">保存规则</button>
+          </div>
+        </form>
+      </div></Transition
+    >
+
+    <Transition name="modal"
+      ><div
+        v-if="paymentTarget"
+        class="ledger-overlay"
+        v-dialog
+        @click.self="paymentTarget = null"
+      >
+        <form class="ledger-dialog" @submit.prevent="payOccurrence">
+          <header class="ledger-dialog-header">
+            <div>
+              <span class="eyebrow"
+                >确认付款 · {{ paymentTarget.periodKey }}</span
+              >
+              <h2>确认本期付款</h2>
+            </div>
+            <button
+              type="button"
+              class="dialog-close"
+              aria-label="关闭弹窗"
+              @click="paymentTarget = null"
+            >
+              ×
+            </button>
+          </header>
+          <p class="payment-hint">
+            确认后会创建一笔支出并进入账本，付款人记录为当前账号。
+          </p>
+          <label
+            >实际金额<input
+              v-model="paymentForm.amount"
+              inputmode="decimal"
+              required
+              pattern="(?:0|[1-9]\d{0,8})(?:\.\d{1,2})?"
+              placeholder="0.00" /></label
+          ><label
+            >付款日期<input
+              v-model="paymentForm.occurredOn"
+              type="date"
+              required
+          /></label>
+          <div class="ledger-dialog-actions">
+            <button
+              type="button"
+              class="quiet-button"
+              @click="paymentTarget = null"
+            >
+              取消</button
+            ><button class="primary-button" :disabled="saving">
+              {{ saving ? "提交中…" : "确认付款并记账" }}
+            </button>
+          </div>
+        </form>
+      </div></Transition
+    >
   </section>
 </template>

@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import { ApiClientError, apiRequest } from "../api/client";
 import { useSessionStore } from "../stores/session";
+import AppIcon from "./AppIcon.vue";
 
 type Category = { id: string; code: string; name: string };
 type Refund = {
@@ -59,6 +60,7 @@ type ReceiptDraft = {
   thingsToVerify: string[];
 };
 
+const props = defineProps<{ initialAction?: string; initialReceipt?: File }>();
 const session = useSessionStore();
 const categories = ref<Category[]>([]);
 const expenses = ref<Expense[]>([]);
@@ -136,7 +138,11 @@ async function load() {
 }
 
 watch(queryString, () => void load());
-onMounted(() => void load());
+onMounted(async () => {
+  await load();
+  if (props.initialAction === "create") openCreate();
+  if (props.initialReceipt) void recognizeReceipt(props.initialReceipt);
+});
 
 function openCreate() {
   selected.value = null;
@@ -413,7 +419,7 @@ async function recognizeReceipt(file: File | undefined) {
           : "";
     error.value =
       code === "AI_NOT_CONFIGURED"
-        ? "AI 服务尚未配置。票据已安全保存，当前不会自动识别。"
+        ? "AI 服务尚未配置，当前无法识别票据，可先手动记账。"
         : code === "AI_QUOTA_EXCEEDED"
           ? "今天的票据识别次数已用完。"
           : code === "PROVIDER_UNAVAILABLE"
@@ -482,7 +488,8 @@ function displayDate(value: string) {
           :disabled="recognizing"
           @click="aiReceiptInput?.click()"
         >
-          ▧ <span>{{ recognizing ? "正在识别…" : "拍票据识别" }}</span>
+          <AppIcon name="camera" :size="18" />
+          <span>{{ recognizing ? "正在识别…" : "拍票据识别" }}</span>
         </button>
         <button class="primary-button" @click="openCreate">＋ 记一笔</button>
       </div>
@@ -490,7 +497,7 @@ function displayDate(value: string) {
     <section v-if="receiptDraft" class="receipt-draft-panel">
       <header>
         <div>
-          <span class="eyebrow">AI DRAFT · 请核对后保存</span>
+          <span class="eyebrow">识别草稿 · 请核对后保存</span>
           <h3>识别到 {{ receiptDraft.items.length }} 项消费</h3>
           <p>
             票据合计
@@ -591,7 +598,9 @@ function displayDate(value: string) {
         class="ledger-row"
         @click="openDetails(item.id)"
       >
-        <span class="ledger-row-mark" aria-hidden="true">▤</span>
+        <span class="ledger-row-mark"
+          ><AppIcon name="ledger" :size="18"
+        /></span>
         <span class="ledger-row-title"
           ><strong>{{ item.title }}</strong
           ><small
@@ -608,9 +617,9 @@ function displayDate(value: string) {
         <span class="ledger-row-payer">{{ item.payer.nickname }}</span>
         <span
           class="ledger-row-amount"
-          :class="{ refunded: item.refund !== '0.00' }"
+          :class="{ refunded: Number(item.refund) > 0 }"
           >¥{{ money(item.net)
-          }}<small v-if="item.refund !== '0.00'"
+          }}<small v-if="Number(item.refund) > 0"
             >支出 ¥{{ money(item.amount) }} · 退 ¥{{
               money(item.refund)
             }}</small
@@ -619,275 +628,283 @@ function displayDate(value: string) {
         <span class="ledger-row-detail">{{ deleted ? "恢复" : "详情" }} ›</span>
       </button>
     </div>
-    <div
-      v-if="selected && !formMode"
-      class="ledger-overlay"
-      @click.self="selected = null"
-      @keydown.esc="selected = null"
-    >
-      <section
-        class="ledger-dialog"
-        role="dialog"
-        aria-modal="true"
-        :aria-label="`${selected.title}详情`"
+    <Transition name="modal"
+      ><div
+        v-if="selected && !formMode"
+        class="ledger-overlay"
+        v-dialog
+        @click.self="selected = null"
+        @keydown.esc="selected = null"
       >
-        <header>
-          <div>
-            <span class="eyebrow"
-              >{{ selected.familyId ? "家庭支出" : "个人支出" }} ·
-              {{ selected.category.name }}</span
+        <section
+          class="ledger-dialog"
+          role="dialog"
+          aria-modal="true"
+          :aria-label="`${selected.title}详情`"
+        >
+          <header>
+            <div>
+              <span class="eyebrow"
+                >{{ selected.familyId ? "家庭支出" : "个人支出" }} ·
+                {{ selected.category.name }}</span
+              >
+              <h2>{{ selected.title }}</h2>
+            </div>
+            <button
+              class="ledger-close"
+              aria-label="关闭"
+              @click="selected = null"
             >
-            <h2>{{ selected.title }}</h2>
+              ×
+            </button>
+          </header>
+          <div class="expense-detail-total">
+            <span>净支出</span><strong>¥{{ money(selected.net) }}</strong
+            ><small
+              >支出 ¥{{ money(selected.amount) }}　·　已退 ¥{{
+                money(selected.refund)
+              }}</small
+            >
           </div>
-          <button
-            class="ledger-close"
-            aria-label="关闭"
-            @click="selected = null"
-          >
-            ×
-          </button>
-        </header>
-        <div class="expense-detail-total">
-          <span>净支出</span><strong>¥{{ money(selected.net) }}</strong
-          ><small
-            >支出 ¥{{ money(selected.amount) }}　·　已退 ¥{{
-              money(selected.refund)
-            }}</small
-          >
-        </div>
-        <dl class="expense-detail-grid">
-          <div>
-            <dt>记账日期</dt>
-            <dd>{{ selected.occurredOn }}</dd>
+          <dl class="expense-detail-grid">
+            <div>
+              <dt>记账日期</dt>
+              <dd>{{ selected.occurredOn }}</dd>
+            </div>
+            <div>
+              <dt>付款人</dt>
+              <dd>{{ selected.payer.nickname }}</dd>
+            </div>
+            <div>
+              <dt>归属</dt>
+              <dd>
+                {{ selected.familyId ? selected.familyName || "家庭" : "个人" }}
+              </dd>
+            </div>
+            <div v-if="selected.quantity">
+              <dt>数量</dt>
+              <dd>{{ selected.quantity }} {{ selected.unit }}</dd>
+            </div>
+            <div v-if="selected.note">
+              <dt>备注</dt>
+              <dd>{{ selected.note }}</dd>
+            </div>
+          </dl>
+          <div v-if="selected.refunds.length" class="refund-list">
+            <h3>退款记录</h3>
+            <div v-for="(refund, index) in selected.refunds" :key="refund.id">
+              <span>退款 {{ index + 1 }} · {{ refund.occurredOn }}</span
+              ><strong>−¥{{ money(refund.amount) }}</strong>
+            </div>
           </div>
-          <div>
-            <dt>付款人</dt>
-            <dd>{{ selected.payer.nickname }}</dd>
+          <div v-if="selected.receipts.length" class="receipt-preview">
+            <h3>票据凭证</h3>
+            <a
+              v-for="receipt in selected.receipts"
+              :key="receipt.id"
+              :href="receipt.contentUrl"
+              target="_blank"
+              rel="noreferrer"
+              >查看安全保存的票据 ↗</a
+            >
           </div>
-          <div>
-            <dt>归属</dt>
-            <dd>
-              {{ selected.familyId ? selected.familyName || "家庭" : "个人" }}
-            </dd>
-          </div>
-          <div v-if="selected.quantity">
-            <dt>数量</dt>
-            <dd>{{ selected.quantity }} {{ selected.unit }}</dd>
-          </div>
-          <div v-if="selected.note">
-            <dt>备注</dt>
-            <dd>{{ selected.note }}</dd>
-          </div>
-        </dl>
-        <div v-if="selected.refunds.length" class="refund-list">
-          <h3>退款记录</h3>
-          <div v-for="(refund, index) in selected.refunds" :key="refund.id">
-            <span>退款 {{ index + 1 }} · {{ refund.occurredOn }}</span
-            ><strong>−¥{{ money(refund.amount) }}</strong>
-          </div>
-        </div>
-        <div v-if="selected.receipts.length" class="receipt-preview">
-          <h3>票据凭证</h3>
-          <a
-            v-for="receipt in selected.receipts"
-            :key="receipt.id"
-            :href="receipt.contentUrl"
-            target="_blank"
-            rel="noreferrer"
-            >查看安全保存的票据 ↗</a
-          >
-        </div>
-        <p v-if="selected.deletedAt" class="ledger-muted">
-          此记录已移入回收站。{{
-            selected.purgeAfter
-              ? `可恢复至 ${new Date(selected.purgeAfter).toLocaleDateString("zh-CN")}`
-              : ""
-          }}
-        </p>
-        <footer class="ledger-dialog-actions">
-          <template v-if="selected.capabilities.canRestore"
-            ><button class="primary-button" @click="restoreExpense(selected)">
-              恢复记录
-            </button></template
+          <p v-if="selected.deletedAt" class="ledger-muted">
+            此记录已移入回收站。{{
+              selected.purgeAfter
+                ? `可恢复至 ${new Date(selected.purgeAfter).toLocaleDateString("zh-CN")}`
+                : ""
+            }}
+          </p>
+          <footer class="ledger-dialog-actions">
+            <template v-if="selected.capabilities.canRestore"
+              ><button class="primary-button" @click="restoreExpense(selected)">
+                恢复记录
+              </button></template
+            >
+            <template v-else>
+              <button
+                v-if="selected.capabilities.canEdit"
+                class="quiet-button"
+                @click="openEdit(selected)"
+              >
+                编辑
+              </button>
+              <button
+                v-if="selected.capabilities.canRefund"
+                class="quiet-button"
+                @click="openRefund(selected)"
+              >
+                登记退款
+              </button>
+              <button
+                v-if="selected.capabilities.canEdit"
+                class="quiet-button"
+                :disabled="uploading"
+                @click="receiptInput?.click()"
+              >
+                {{ uploading ? "正在上传…" : "添加票据" }}
+              </button>
+              <button
+                v-if="selected.capabilities.canDelete"
+                class="danger-button"
+                @click="removeExpense(selected)"
+              >
+                移入回收站
+              </button>
+            </template>
+          </footer>
+        </section>
+      </div></Transition
+    >
+    <Transition name="modal"
+      ><div
+        v-if="formMode"
+        class="ledger-overlay"
+        v-dialog
+        @click.self="closeForm"
+        @keydown.esc="closeForm"
+      >
+        <form class="ledger-dialog ledger-form" @submit.prevent="submitForm">
+          <header>
+            <div>
+              <span class="eyebrow">{{
+                formMode === "refund"
+                  ? "关联到原支出"
+                  : formMode === "edit"
+                    ? "更新记录"
+                    : "新建支出"
+              }}</span>
+              <h2>
+                {{
+                  formMode === "refund"
+                    ? selected?.title
+                    : formMode === "edit"
+                      ? "编辑这笔支出"
+                      : "记一笔"
+                }}
+              </h2>
+            </div>
+            <button
+              type="button"
+              class="ledger-close"
+              aria-label="关闭"
+              @click="closeForm"
+            >
+              ×
+            </button>
+          </header>
+          <template v-if="formMode === 'refund'"
+            ><label
+              >退款金额<input
+                v-model="form.refundAmount"
+                inputmode="decimal"
+                type="text"
+                required
+                placeholder="0.00" /></label
+            ><label
+              >退款日期<input v-model="form.occurredOn" type="date" required
+            /></label>
+            <p class="ledger-muted">
+              退款将关联到原支出，累计不能超过原支出金额。
+            </p></template
           >
           <template v-else>
-            <button
-              v-if="selected.capabilities.canEdit"
-              class="quiet-button"
-              @click="openEdit(selected)"
-            >
-              编辑
-            </button>
-            <button
-              v-if="selected.capabilities.canRefund"
-              class="quiet-button"
-              @click="openRefund(selected)"
-            >
-              登记退款
-            </button>
-            <button
-              v-if="selected.capabilities.canEdit"
-              class="quiet-button"
-              :disabled="uploading"
-              @click="receiptInput?.click()"
-            >
-              {{ uploading ? "正在上传…" : "添加票据" }}
-            </button>
-            <button
-              v-if="selected.capabilities.canDelete"
-              class="danger-button"
-              @click="removeExpense(selected)"
-            >
-              移入回收站
-            </button>
-          </template>
-        </footer>
-      </section>
-    </div>
-    <div
-      v-if="formMode"
-      class="ledger-overlay"
-      @click.self="closeForm"
-      @keydown.esc="closeForm"
-    >
-      <form class="ledger-dialog ledger-form" @submit.prevent="submitForm">
-        <header>
-          <div>
-            <span class="eyebrow">{{
-              formMode === "refund"
-                ? "关联到原支出"
-                : formMode === "edit"
-                  ? "更新记录"
-                  : "新建支出"
-            }}</span>
-            <h2>
-              {{
-                formMode === "refund"
-                  ? selected?.title
-                  : formMode === "edit"
-                    ? "编辑这笔支出"
-                    : "记一笔"
-              }}
-            </h2>
-          </div>
-          <button
-            type="button"
-            class="ledger-close"
-            aria-label="关闭"
-            @click="closeForm"
-          >
-            ×
-          </button>
-        </header>
-        <template v-if="formMode === 'refund'"
-          ><label
-            >退款金额<input
-              v-model="form.refundAmount"
-              inputmode="decimal"
-              type="text"
-              required
-              placeholder="0.00" /></label
-          ><label
-            >退款日期<input v-model="form.occurredOn" type="date" required
-          /></label>
-          <p class="ledger-muted">
-            退款将关联到原支出，累计不能超过原支出金额。
-          </p></template
-        >
-        <template v-else>
-          <label
-            >金额<input
-              v-model="form.amount"
-              inputmode="decimal"
-              type="text"
-              required
-              placeholder="0.00"
-          /></label>
-          <div class="ledger-form-grid">
             <label
-              >分类<select v-model="form.categoryId" required>
-                <option
-                  v-for="category in categories"
-                  :key="category.id"
-                  :value="category.id"
-                >
-                  {{ category.name }}
-                </option>
-              </select></label
-            ><label
-              >日期<input v-model="form.occurredOn" type="date" required
+              >金额<input
+                v-model="form.amount"
+                inputmode="decimal"
+                type="text"
+                required
+                placeholder="0.00"
             /></label>
-          </div>
-          <label
-            >名称<input
-              v-model.trim="form.title"
-              maxlength="120"
-              required
-              placeholder="例如：晚餐、燃气费"
-          /></label>
-          <details class="ledger-extra">
-            <summary>数量、单价和备注</summary>
             <div class="ledger-form-grid">
               <label
-                >数量<input
-                  v-model="form.quantity"
-                  inputmode="decimal"
-                  type="text"
-                  placeholder="可选" /></label
+                >分类<select v-model="form.categoryId" required>
+                  <option
+                    v-for="category in categories"
+                    :key="category.id"
+                    :value="category.id"
+                  >
+                    {{ category.name }}
+                  </option>
+                </select></label
               ><label
-                >单位<input
-                  v-model.trim="form.unit"
-                  maxlength="24"
-                  placeholder="件、千瓦时" /></label
-              ><label
-                >单价<input
-                  v-model="form.unitPrice"
-                  inputmode="decimal"
-                  type="text"
-                  placeholder="可选"
+                >日期<input v-model="form.occurredOn" type="date" required
               /></label>
             </div>
             <label
-              >备注<input
-                v-model.trim="form.note"
-                maxlength="500"
-                placeholder="可选"
+              >名称<input
+                v-model.trim="form.title"
+                maxlength="120"
+                required
+                placeholder="例如：晚餐、燃气费"
             /></label>
-          </details>
-          <label v-if="session.family" class="ledger-visibility"
-            ><input
-              v-model="includeFamily"
-              type="checkbox"
-              :disabled="formMode === 'edit'"
-            />
-            记入家庭收支 <small>家庭成员可以查看这笔记录</small></label
-          >
-          <p
-            v-else-if="formMode === 'edit' && selected?.familyId"
-            class="ledger-muted"
-          >
-            家庭归属在创建时确认，不能通过编辑切换。
-          </p>
-          <p v-if="includeFamily" class="ledger-visibility-note">
-            此支出会显示在家庭空间及家庭报表中。
-          </p>
-        </template>
-        <p v-if="error" class="form-error" role="alert">{{ error }}</p>
-        <footer class="ledger-dialog-actions">
-          <button type="button" class="quiet-button" @click="closeForm">
-            取消</button
-          ><button class="primary-button" :disabled="saving">
-            {{
-              saving
-                ? "正在保存…"
-                : formMode === "refund"
-                  ? "确认退款"
-                  : "保存记录"
-            }}
-          </button>
-        </footer>
-      </form>
-    </div>
+            <details class="ledger-extra">
+              <summary>数量、单价和备注</summary>
+              <div class="ledger-form-grid">
+                <label
+                  >数量<input
+                    v-model="form.quantity"
+                    inputmode="decimal"
+                    type="text"
+                    placeholder="可选" /></label
+                ><label
+                  >单位<input
+                    v-model.trim="form.unit"
+                    maxlength="24"
+                    placeholder="件、千瓦时" /></label
+                ><label
+                  >单价<input
+                    v-model="form.unitPrice"
+                    inputmode="decimal"
+                    type="text"
+                    placeholder="可选"
+                /></label>
+              </div>
+              <label
+                >备注<input
+                  v-model.trim="form.note"
+                  maxlength="500"
+                  placeholder="可选"
+              /></label>
+            </details>
+            <label v-if="session.family" class="ledger-visibility"
+              ><input
+                v-model="includeFamily"
+                type="checkbox"
+                :disabled="formMode === 'edit'"
+              />
+              <span
+                >记入家庭收支<small>家庭成员可以查看这笔记录</small></span
+              ></label
+            >
+            <p
+              v-else-if="formMode === 'edit' && selected?.familyId"
+              class="ledger-muted"
+            >
+              家庭归属在创建时确认，不能通过编辑切换。
+            </p>
+            <p v-if="includeFamily" class="ledger-visibility-note">
+              此支出会显示在家庭空间及家庭报表中。
+            </p>
+          </template>
+          <p v-if="error" class="form-error" role="alert">{{ error }}</p>
+          <footer class="ledger-dialog-actions">
+            <button type="button" class="quiet-button" @click="closeForm">
+              取消</button
+            ><button class="primary-button" :disabled="saving">
+              {{
+                saving
+                  ? "正在保存…"
+                  : formMode === "refund"
+                    ? "确认退款"
+                    : "保存记录"
+              }}
+            </button>
+          </footer>
+        </form>
+      </div></Transition
+    >
     <input
       ref="receiptInput"
       class="sr-only"

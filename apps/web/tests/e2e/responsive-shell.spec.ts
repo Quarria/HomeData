@@ -27,7 +27,7 @@ test("shows the approved personal-first navigation on desktop and mobile", async
   );
   await page.goto("/");
   await expect(page).toHaveTitle(/家常账/);
-  await expect(page.getByRole("heading", { name: "首页" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "个人日常" })).toBeVisible();
 
   if (page.viewportSize()!.width <= 650) {
     await expect(page.locator(".mobile-current-space")).toHaveText("个人空间");
@@ -44,7 +44,9 @@ test("shows the approved personal-first navigation on desktop and mobile", async
     await expect(
       page.getByRole("navigation", { name: "主导航" }),
     ).toBeVisible();
-    await expect(page.getByRole("button", { name: "报表" })).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "报表", exact: true }),
+    ).toBeVisible();
   }
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth),
@@ -357,6 +359,13 @@ test("creates a personal task through the responsive task form", async ({
   await page.getByRole("button", { name: /新建待办/ }).click();
   const closeDialog = page.getByRole("button", { name: "关闭弹窗" });
   await expect(closeDialog).toBeVisible();
+  await page.locator(".ledger-dialog").evaluate(async (element) => {
+    await Promise.all(
+      element
+        .getAnimations({ subtree: true })
+        .map((animation) => animation.finished.catch(() => {})),
+    );
+  });
   const closeBox = await closeDialog.boundingBox();
   expect(closeBox).not.toBeNull();
   expect(closeBox!.width).toBe(36);

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { ApiClientError } from "./api/client";
+import AppIcon from "./components/AppIcon.vue";
+import HomeView from "./components/HomeView.vue";
 import LoginView from "./components/LoginView.vue";
 import PasswordChangeView from "./components/PasswordChangeView.vue";
 import ProfileView from "./components/ProfileView.vue";
@@ -24,16 +26,50 @@ const passwordNotice = ref("");
 const notificationsOpen = ref(false);
 const unreadNotifications = ref(0);
 const pages = [
-  { id: "home", title: "首页", icon: "⌂" },
-  { id: "ledger", title: "账本", icon: "▤" },
-  { id: "tasks", title: "待办与提醒", icon: "◷" },
-  { id: "reports", title: "报表", icon: "▥" },
-  { id: "profile", title: "我的", icon: "◉" },
+  { id: "home", title: "首页" },
+  { id: "ledger", title: "账本" },
+  { id: "tasks", title: "待办与提醒" },
+  { id: "reports", title: "报表" },
+  { id: "profile", title: "我的" },
 ] as const;
 const activePage = ref<(typeof pages)[number]["id"]>("home");
 const activeTitle = computed(
   () => pages.find(({ id }) => id === activePage.value)?.title ?? "首页",
 );
+const activeIndex = computed(() =>
+  pages.findIndex((page) => page.id === activePage.value),
+);
+const pageAction = ref("");
+const targetId = ref("");
+const receiptFile = ref<File>();
+const pageComponents = {
+  home: HomeView,
+  ledger: LedgerView,
+  tasks: TasksView,
+  reports: ReportsView,
+  profile: ProfileView,
+};
+const pageProps = computed(() =>
+  activePage.value === "ledger"
+    ? { initialAction: pageAction.value, initialReceipt: receiptFile.value }
+    : activePage.value === "tasks"
+      ? { initialAction: pageAction.value, targetId: targetId.value }
+      : activePage.value === "profile"
+        ? { notice: passwordNotice.value }
+        : {},
+);
+function navigate(target: {
+  page: typeof activePage.value;
+  action?: string;
+  id?: string;
+  file?: File;
+}) {
+  pageAction.value = target.action ?? "";
+  targetId.value = target.id ?? "";
+  receiptFile.value = target.file;
+  activePage.value = target.page;
+  window.scrollTo({ top: 0, behavior: "instant" });
+}
 const spaceName = computed(() =>
   session.activeSpace === "family" && session.family
     ? session.family.name
@@ -78,6 +114,10 @@ async function logout() {
 function toggleSpace() {
   session.setSpace(session.activeSpace === "personal" ? "family" : "personal");
 }
+
+function disableLeavingPage(element: Element) {
+  element.setAttribute("inert", "");
+}
 </script>
 
 <template>
@@ -111,14 +151,20 @@ function toggleSpace() {
         ><span class="brand-mark">家</span
         ><span>家常账<small>日常费用与提醒</small></span></a
       >
-      <nav class="desktop-nav" aria-label="主导航">
+      <nav
+        class="desktop-nav"
+        aria-label="主导航"
+        :style="{ '--active-index': activeIndex }"
+      >
+        <span class="nav-selection" aria-hidden="true"></span>
         <button
           v-for="page in pages"
           :key="page.id"
           :class="['nav-item', { active: activePage === page.id }]"
-          @click="activePage = page.id"
+          :aria-current="activePage === page.id ? 'page' : undefined"
+          @click="navigate({ page: page.id })"
         >
-          <span class="nav-icon" aria-hidden="true">{{ page.icon }}</span
+          <span class="nav-icon"><AppIcon :name="page.id" /></span
           >{{ page.title }}
         </button>
       </nav>
@@ -155,6 +201,11 @@ function toggleSpace() {
             role="group"
             aria-label="空间切换"
           >
+            <span
+              class="scope-selection"
+              :class="{ family: session.activeSpace === 'family' }"
+              aria-hidden="true"
+            ></span>
             <button
               :class="{ selected: session.activeSpace === 'personal' }"
               @click="session.setSpace('personal')"
@@ -174,19 +225,26 @@ function toggleSpace() {
           </div>
         </div>
         <div class="top-actions">
-          <span class="preview-tag">{{
-            session.family?.status === "ARCHIVED" &&
-            session.activeSpace === "family"
-              ? "只读归档"
-              : "安全记录"
-          }}</span>
+          <span
+            v-if="
+              session.family?.status === 'ARCHIVED' &&
+              session.activeSpace === 'family'
+            "
+            class="preview-tag"
+            >{{
+              session.family?.status === "ARCHIVED" &&
+              session.activeSpace === "family"
+                ? "只读归档"
+                : "安全记录"
+            }}</span
+          >
           <button
             class="icon-button"
             aria-label="消息提醒"
             :aria-expanded="notificationsOpen"
             @click="notificationsOpen = !notificationsOpen"
           >
-            ♧<i v-if="unreadNotifications"></i>
+            <AppIcon name="bell" /><i v-if="unreadNotifications"></i>
           </button>
           <span class="avatar small-avatar">{{
             session.account.nickname.slice(0, 1)
@@ -203,102 +261,51 @@ function toggleSpace() {
         />
       </header>
       <main class="page-content">
-        <div v-if="activePage !== 'reports'" class="page-intro">
+        <div
+          v-if="activePage !== 'reports' && activePage !== 'home'"
+          class="page-intro"
+        >
           <h1>{{ activeTitle }}</h1>
-          <p>
-            {{
-              activePage === "home"
-                ? "为日常开支和家庭事务，留一份清晰、安心的记录。"
-                : `${spaceName} · ${activeTitle}`
-            }}
-          </p>
         </div>
 
-        <ProfileView
-          v-if="activePage === 'profile'"
-          :notice="passwordNotice"
-          @change-password="
-            passwordMode = true;
-            authError = '';
-            passwordNotice = '';
-          "
-          @logout="logout"
-        />
-
-        <LedgerView v-else-if="activePage === 'ledger'" />
-
-        <TasksView v-else-if="activePage === 'tasks'" />
-
-        <ReportsView v-else-if="activePage === 'reports'" />
-
-        <template v-else-if="activePage === 'home'">
-          <section class="welcome-panel" aria-label="首页概览">
-            <div class="welcome-copy">
-              <span class="status-pill"
-                ><i></i> {{ spaceName }} · 记录由你掌握</span
-              >
-              <h2>把每一笔日常，<br />记得明白一些。</h2>
-              <p>从一笔清楚的日常开支开始，慢慢建立适合自己的家庭账本。</p>
-              <div class="welcome-actions">
-                <button class="primary-button" @click="activePage = 'ledger'">
-                  开始记一笔 <span>↗</span>
-                </button>
-                <button class="text-button" @click="activePage = 'tasks'">
-                  查看待办 <span>→</span>
-                </button>
-              </div>
-            </div>
-            <div class="welcome-art" aria-hidden="true">
-              <div class="art-orbit"></div>
-              <div class="art-card">
-                <span class="art-label">TODAY'S NOTE</span
-                ><span class="art-line"></span
-                ><span class="art-line short"></span
-                ><span class="art-stamp">家</span>
-              </div>
-              <span class="art-spark spark-one">✳</span
-              ><span class="art-spark spark-two">·</span>
-            </div>
-          </section>
-          <section class="next-step">
-            <span class="step-number">01</span>
-            <div>
-              <strong>从清晰的账本开始</strong>
-              <p>
-                分类统一、个人付款，水电燃气分别统计；家庭空间由你主动切换。
-              </p>
-            </div>
-            <span class="step-arrow">↗</span>
-          </section>
-        </template>
-
-        <section v-else class="feature-placeholder">
-          <span class="eyebrow"
-            >{{ activeTitle.toUpperCase() }} · 正在按批次开发</span
-          >
-          <h2>{{ activeTitle }}会使用同一套个人与家庭权限。</h2>
-          <p>
-            当前批次已完成账号、家庭和安全会话基础。后续批次会逐步接入真实记录、提醒、报表和主动
-            AI 功能。
-          </p>
-          <button class="quiet-button" @click="activePage = 'profile'">
-            查看账号与家庭设置
-          </button>
-        </section>
+        <Transition
+          name="page"
+          mode="out-in"
+          @before-leave="disableLeavingPage"
+        >
+          <component
+            :is="pageComponents[activePage]"
+            :key="activePage"
+            v-bind="pageProps"
+            @navigate="navigate"
+            @change-password="
+              passwordMode = true;
+              authError = '';
+              passwordNotice = '';
+            "
+            @logout="logout"
+          />
+        </Transition>
 
         <footer class="page-footer">
-          家常账 <span>记录日常，也照顾生活。</span>
+          家常账 <span>{{ spaceName }} · 人民币</span>
         </footer>
       </main>
     </div>
-    <nav class="mobile-nav" aria-label="手机主导航">
+    <nav
+      class="mobile-nav"
+      aria-label="手机主导航"
+      :style="{ '--active-index': activeIndex }"
+    >
+      <span class="mobile-nav-selection" aria-hidden="true"></span>
       <button
         v-for="page in pages"
         :key="page.id"
         :class="['mobile-nav-item', { active: activePage === page.id }]"
-        @click="activePage = page.id"
+        :aria-current="activePage === page.id ? 'page' : undefined"
+        @click="navigate({ page: page.id })"
       >
-        <span>{{ page.icon }}</span
+        <span><AppIcon :name="page.id" /></span
         ><small>{{ page.title === "待办与提醒" ? "待办" : page.title }}</small>
       </button>
     </nav>

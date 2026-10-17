@@ -1,0 +1,140 @@
+{
+  "schemaVersion": 1,
+  "lang": "zh",
+  "project": "家常账 · 界面方向对比",
+  "round": "01",
+  "brief": "新增 06 生活日历 · 左侧导航：沿用偏好的 02 字体、莓红配色与日期时间线，仅调整 PC 导航与内容宽度。可与原版 02 直接比较；其余方向保留作对照。",
+  "nativeViewport": "1440x900",
+  "candidates": [
+    {
+      "id": "baseline",
+      "name": "当前账页版",
+      "baseline": true,
+      "kind": "image",
+      "source": "baseline/page.png",
+      "concept": "已确认的现有原型，作为本轮对照。",
+      "typography": "Bricolage Grotesque 数字 + 微软雅黑",
+      "palette": [
+        "#eeecea",
+        "#333231",
+        "#526349"
+      ],
+      "traits": [
+        "固定侧栏",
+        "纸面金额摘要",
+        "右侧近期事项"
+      ]
+    },
+    {
+      "id": "workspace",
+      "name": "清晰工作台",
+      "source": "a-workspace.html",
+      "concept": "把记账变成顺手完成的日常动作，信息清楚、入口稳定。",
+      "typography": "Segoe UI / 微软雅黑；标题 30、金额 76、正文 15px",
+      "palette": [
+        "#f3f7f6",
+        "#195b50",
+        "#e6f1ed"
+      ],
+      "traits": [
+        "首轮候选",
+        "固定侧栏 + 横向金额摘要",
+        "快捷记录与事项并列",
+        "低密度、柔和方角"
+      ]
+    },
+    {
+      "id": "calendar",
+      "name": "生活日历",
+      "source": "b-calendar.html",
+      "concept": "让待处理的小事按时间排好，开支安静地留在一旁。",
+      "typography": "宋体标题 34 + Georgia 金额 53 + 微软雅黑正文 15px",
+      "palette": [
+        "#faf6f2",
+        "#833d50",
+        "#eee3df"
+      ],
+      "traits": [
+        "顶部导航，释放横向空间",
+        "一周日期带 + 到期事项时间线",
+        "右侧金额与快捷记录",
+        "柔和圆角与莓红操作色"
+      ]
+    },
+    {
+      "id": "ledger",
+      "name": "数字账页",
+      "source": "c-ledger.html",
+      "concept": "像核对一张清晰的账页，大数字、直线和对齐就是界面。",
+      "typography": "宋体品牌 30 + Consolas 金额 112 + 微软雅黑正文 15px",
+      "palette": [
+        "#f1f3ee",
+        "#283449",
+        "#cc421b"
+      ],
+      "traits": [
+        "通栏账页，无固定侧栏",
+        "等宽大金额构成主视觉",
+        "快捷记录窄栏 + 事项横表",
+        "直角、细线与朱红记账入口"
+      ]
+    },
+    {
+      "id": "electric",
+      "name": "电光日常",
+      "source": "d-electric.html",
+      "concept": "让每天的记录有一点态度：大数字、亮色动作与轻快的生活事项。",
+      "typography": "本地 Bricolage Grotesque 金额 124px；微软雅黑标题 42px、正文 15px",
+      "palette": [
+        "#f3f2f0",
+        "#191a20",
+        "#ddfa52",
+        "#e4dff3"
+      ],
+      "traits": [
+        "上一轮候选，保留对照",
+        "墨黑金额面板 + 酸柠记账入口",
+        "大字号、非对称块面与圆形控件",
+        "淡紫事项横排，保留原有功能边界"
+      ]
+    },
+    {
+      "id": "breeze",
+      "name": "清风日常",
+      "source": "e-breeze.html",
+      "concept": "让日常记录轻一点：浅底、清楚的间距和安静的细节。",
+      "typography": "本地 Bricolage Grotesque 金额 78px / 450；微软雅黑标题 28px，正文 15px",
+      "palette": [
+        "#ffffff",
+        "#f7faf8",
+        "#45765c",
+        "#eaf3ed"
+      ],
+      "traits": [
+        "上一轮候选，保留对照",
+        "PC 固定左侧导航",
+        "金额无卡片承托，留白组织层级",
+        "白色线框操作，事项以细线分隔"
+      ]
+    },
+    {
+      "id": "calendar-left",
+      "name": "生活日历 · 左侧导航",
+      "source": "f-calendar-left.html",
+      "concept": "保留 02 的生活感，把熟悉的导航安放在左侧。",
+      "typography": "沿用 02：宋体标题 34、Georgia 金额 50、微软雅黑正文 15px",
+      "palette": [
+        "#faf6f2",
+        "#833d50",
+        "#eee3df",
+        "#f4ede8"
+      ],
+      "traits": [
+        "本轮新增 · 基于偏好的 02",
+        "210px 固定左侧导航",
+        "保留日期带与事项时间线",
+        "右侧金额和快捷记录，原版 02 可直接对照"
+      ]
+    }
+  ]
+}

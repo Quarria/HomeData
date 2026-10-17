@@ -225,9 +225,9 @@ const categoryMax = computed(() =>
 );
 
 function formatPeriod(value: string) {
-  return period.value === "day"
-    ? value.slice(5)
-    : value.replace("-", "年") + "月";
+  return period.value === "year"
+    ? `${Number(value.slice(5, 7))}月`
+    : `${Number(value.slice(5, 7))}/${Number(value.slice(8, 10))}`;
 }
 
 function formatMoney(value: string) {

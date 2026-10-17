@@ -257,7 +257,6 @@ onMounted(() => void loadReminderPreference());
         <section class="profile-section account-section">
           <div class="section-heading account-section-heading">
             <div>
-              <span class="eyebrow">YOUR ACCOUNT</span>
               <h2>个人账号</h2>
             </div>
             <div class="profile-heading-actions">
@@ -293,7 +292,10 @@ onMounted(() => void loadReminderPreference());
                 保存昵称
               </button>
             </form>
-            <button class="quiet-button" @click="emit('changePassword')">
+            <button
+              class="text-button password-action"
+              @click="emit('changePassword')"
+            >
               修改密码
             </button>
           </div>
@@ -302,7 +304,6 @@ onMounted(() => void loadReminderPreference());
         <section class="profile-section reminder-section">
           <div class="section-heading">
             <div>
-              <span class="eyebrow">REMINDER SETTINGS</span>
               <h2>提醒设置</h2>
             </div>
             <span class="role-badge">站内提醒</span>
@@ -359,7 +360,6 @@ onMounted(() => void loadReminderPreference());
         <section class="profile-section family-section">
           <div class="section-heading">
             <div>
-              <span class="eyebrow">HOUSEHOLD SPACE</span>
               <h2>家庭</h2>
             </div>
             <span v-if="session.family" class="role-badge">{{
@@ -510,7 +510,6 @@ onMounted(() => void loadReminderPreference());
         >
           <div class="section-heading">
             <div>
-              <span class="eyebrow">SYSTEM ACCESS</span>
               <h2>账号管理</h2>
             </div>
             <button class="quiet-button" @click="loadAccounts">
