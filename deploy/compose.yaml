@@ -23,7 +23,12 @@ services:
     build:
       context: ..
       dockerfile: deploy/Dockerfile.server
-    command: ["./node_modules/.bin/prisma", "migrate", "deploy"]
+    command:
+      [
+        "sh",
+        "-c",
+        "./node_modules/.bin/prisma migrate deploy && ./node_modules/.bin/prisma db seed",
+      ]
     env_file: runtime.env
     depends_on: { db: { condition: service_healthy } }
     restart: "no"

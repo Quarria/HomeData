@@ -138,8 +138,12 @@ async function load() {
 }
 
 watch(queryString, () => void load());
-onMounted(async () => {
-  await load();
+watch(categories, (nextCategories) => {
+  if (formMode.value === "create" && !form.categoryId)
+    form.categoryId = nextCategories[0]?.id ?? "";
+});
+onMounted(() => {
+  void load();
   if (props.initialAction === "create") openCreate();
   if (props.initialReceipt) void recognizeReceipt(props.initialReceipt);
 });
@@ -491,7 +495,9 @@ function displayDate(value: string) {
           <AppIcon name="camera" :size="18" />
           <span>{{ recognizing ? "正在识别…" : "拍票据识别" }}</span>
         </button>
-        <button class="primary-button" @click="openCreate">＋ 记一笔</button>
+        <button type="button" class="primary-button" @click="openCreate">
+          ＋ 记一笔
+        </button>
       </div>
     </div>
     <section v-if="receiptDraft" class="receipt-draft-panel">
@@ -820,6 +826,9 @@ function displayDate(value: string) {
             <div class="ledger-form-grid">
               <label
                 >分类<select v-model="form.categoryId" required>
+                  <option v-if="!categories.length" value="" disabled>
+                    暂无可用分类
+                  </option>
                   <option
                     v-for="category in categories"
                     :key="category.id"
@@ -832,6 +841,9 @@ function displayDate(value: string) {
                 >日期<input v-model="form.occurredOn" type="date" required
               /></label>
             </div>
+            <p v-if="!categories.length" class="form-error" role="alert">
+              分类数据尚未就绪，暂时无法保存支出。请联系管理员检查分类初始化。
+            </p>
             <label
               >名称<input
                 v-model.trim="form.title"
@@ -892,13 +904,20 @@ function displayDate(value: string) {
           <footer class="ledger-dialog-actions">
             <button type="button" class="quiet-button" @click="closeForm">
               取消</button
-            ><button class="primary-button" :disabled="saving">
+            ><button
+              class="primary-button"
+              :disabled="
+                saving || (formMode !== 'refund' && !categories.length)
+              "
+            >
               {{
                 saving
                   ? "正在保存…"
-                  : formMode === "refund"
-                    ? "确认退款"
-                    : "保存记录"
+                  : !categories.length && formMode !== "refund"
+                    ? "分类未就绪"
+                    : formMode === "refund"
+                      ? "确认退款"
+                      : "保存记录"
               }}
             </button>
           </footer>

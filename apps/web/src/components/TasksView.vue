@@ -128,6 +128,10 @@ watch(
   [section, statusFilter, familyId, () => session.activeSpace],
   () => void load(),
 );
+watch(categories, (nextCategories) => {
+  if (ruleDialog.value && !ruleForm.categoryId)
+    ruleForm.categoryId = nextCategories[0]?.id ?? "";
+});
 onMounted(async () => {
   await load();
   if (props.initialAction === "create") openTask();
@@ -623,6 +627,9 @@ async function payOccurrence() {
               placeholder="例如：每月电费" /></label
           ><label
             >分类<select v-model="ruleForm.categoryId" required>
+              <option v-if="!categories.length" value="" disabled>
+                暂无可用分类
+              </option>
               <option
                 v-for="category in categories"
                 :key="category.id"
@@ -632,6 +639,9 @@ async function payOccurrence() {
               </option>
             </select></label
           >
+          <p v-if="!categories.length" class="inline-error" role="alert">
+            分类数据尚未就绪，暂时无法保存固定费用。请联系管理员检查分类初始化。
+          </p>
           <div class="form-grid">
             <label
               >周期<select v-model="ruleForm.frequency">
@@ -655,7 +665,12 @@ async function payOccurrence() {
               @click="ruleDialog = false"
             >
               取消</button
-            ><button class="primary-button" :disabled="saving">保存规则</button>
+            ><button
+              class="primary-button"
+              :disabled="saving || !categories.length"
+            >
+              {{ categories.length ? "保存规则" : "分类未就绪" }}
+            </button>
           </div>
         </form>
       </div></Transition

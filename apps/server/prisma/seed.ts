@@ -16,7 +16,8 @@ try {
     await prisma.category.upsert({
       where: { code: category.code },
       create: { id: randomUUID(), ...category, sortOrder: index + 1 },
-      update: { name: category.name, sortOrder: index + 1, isActive: true },
+      // Preserve an administrator's explicit inactive state on later deploys.
+      update: { name: category.name, sortOrder: index + 1 },
     });
   }
 } finally {
