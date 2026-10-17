@@ -627,41 +627,48 @@ function displayDate(value: string) {
           deleted ? "回收站暂时为空。" : "这里还没有记录，从一笔日常开支开始。"
         }}
       </div>
-      <button
-        v-for="item in expenses"
-        :key="item.id"
-        class="ledger-row"
-        @click="openDetails(item.id)"
-      >
-        <span class="ledger-row-mark"
-          ><AppIcon name="ledger" :size="18"
-        /></span>
-        <span class="ledger-row-title"
-          ><strong>{{ item.title }}</strong
-          ><small
-            >{{ displayDate(item.occurredOn) }} ·
-            {{ item.familyId ? "家庭费用" : "个人费用"
-            }}<template v-if="item.deletedAt">
-              ·
-              {{ new Date(item.purgeAfter ?? "").toLocaleDateString("zh-CN") }}
-              前可恢复</template
-            ></small
-          ></span
+      <TransitionGroup name="ledger-list" tag="div" class="ledger-row-list">
+        <button
+          v-for="(item, index) in expenses"
+          :key="item.id"
+          class="ledger-row"
+          :style="{ '--row-delay': `${Math.min(index * 22, 180)}ms` }"
+          @click="openDetails(item.id)"
         >
-        <span class="ledger-row-category">{{ item.category.name }}</span>
-        <span class="ledger-row-payer">{{ item.payer.nickname }}</span>
-        <span
-          class="ledger-row-amount"
-          :class="{ refunded: Number(item.refund) > 0 }"
-          >¥{{ money(item.net)
-          }}<small v-if="Number(item.refund) > 0"
-            >支出 ¥{{ money(item.amount) }} · 退 ¥{{
-              money(item.refund)
-            }}</small
-          ></span
-        >
-        <span class="ledger-row-detail">{{ deleted ? "恢复" : "详情" }} ›</span>
-      </button>
+          <span class="ledger-row-mark"
+            ><AppIcon name="ledger" :size="18"
+          /></span>
+          <span class="ledger-row-title"
+            ><strong>{{ item.title }}</strong
+            ><small
+              >{{ displayDate(item.occurredOn) }} ·
+              {{ item.familyId ? "家庭费用" : "个人费用"
+              }}<template v-if="item.deletedAt">
+                ·
+                {{
+                  new Date(item.purgeAfter ?? "").toLocaleDateString("zh-CN")
+                }}
+                前可恢复</template
+              ></small
+            ></span
+          >
+          <span class="ledger-row-category">{{ item.category.name }}</span>
+          <span class="ledger-row-payer">{{ item.payer.nickname }}</span>
+          <span
+            class="ledger-row-amount"
+            :class="{ refunded: Number(item.refund) > 0 }"
+            >¥{{ money(item.net)
+            }}<small v-if="Number(item.refund) > 0"
+              >支出 ¥{{ money(item.amount) }} · 退 ¥{{
+                money(item.refund)
+              }}</small
+            ></span
+          >
+          <span class="ledger-row-detail"
+            >{{ deleted ? "恢复" : "详情" }} ›</span
+          >
+        </button>
+      </TransitionGroup>
       <button
         v-if="nextCursor && !loading"
         class="quiet-button ledger-load-more"
