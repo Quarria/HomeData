@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from "vue";
-import { ApiClientError, apiRequest } from "../api/client";
+import { ApiClientError, apiRequest, newIdempotencyKey } from "../api/client";
 import { useSessionStore } from "../stores/session";
 import AppIcon from "./AppIcon.vue";
 
@@ -162,7 +162,7 @@ function openCreate() {
     refundAmount: "",
   });
   includeFamily.value = session.activeSpace === "family";
-  createIdempotencyKey.value = crypto.randomUUID();
+  createIdempotencyKey.value = newIdempotencyKey();
   formMode.value = "create";
   error.value = "";
 }
@@ -199,7 +199,7 @@ function openRefund(item: Expense) {
     refundAmount: "",
   });
   formMode.value = "refund";
-  refundIdempotencyKey.value = crypto.randomUUID();
+  refundIdempotencyKey.value = newIdempotencyKey();
   error.value = "";
 }
 
@@ -387,7 +387,7 @@ async function recognizeReceipt(file: File | undefined) {
       method: "POST",
       body,
     });
-    const idempotencyKey = crypto.randomUUID();
+    const idempotencyKey = newIdempotencyKey();
     const run = await apiRequest<{ id: string }>("/ai/receipt-extractions", {
       method: "POST",
       headers: { "idempotency-key": idempotencyKey },

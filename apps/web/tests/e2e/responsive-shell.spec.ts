@@ -214,6 +214,12 @@ test("opens a read-only public share without an account session", async ({
 test("records a personal expense through the approved ledger form", async ({
   page,
 }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(globalThis.crypto, "randomUUID", {
+      configurable: true,
+      value: undefined,
+    });
+  });
   await page.route("**/api/v1/me", (route) =>
     route.fulfill({
       status: 200,

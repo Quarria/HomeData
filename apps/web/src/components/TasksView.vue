@@ -4,6 +4,7 @@ import {
   ApiClientError,
   apiRequest,
   deleteJson,
+  newIdempotencyKey,
   patchJson,
   postJson,
 } from "../api/client";
@@ -309,7 +310,7 @@ function openPayment(occurrence: Occurrence) {
   paymentTarget.value = occurrence;
   paymentForm.amount = occurrence.amount ?? "";
   paymentForm.occurredOn = occurrence.dueOn;
-  paymentKey.value = crypto.randomUUID();
+  paymentKey.value = newIdempotencyKey();
 }
 async function payOccurrence() {
   if (!paymentTarget.value) return;

@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { ApiClientError, apiRequest, postJson } from "../api/client";
+import {
+  ApiClientError,
+  apiRequest,
+  newIdempotencyKey,
+  postJson,
+} from "../api/client";
 import { useSessionStore } from "../stores/session";
 
 type Period = "day" | "month" | "year";
@@ -397,7 +402,7 @@ async function generateAnalysis() {
       result?: typeof analysisResult.value;
     }>("/ai/analyses", {
       method: "POST",
-      headers: { "idempotency-key": crypto.randomUUID() },
+      headers: { "idempotency-key": newIdempotencyKey() },
       body: JSON.stringify({
         ...Object.fromEntries(query.value),
         basis: "net",

@@ -10,6 +10,19 @@ export class ApiClientError extends Error {
 
 let csrfToken: string | undefined;
 
+export function newIdempotencyKey() {
+  const cryptoApi = globalThis.crypto;
+  if (typeof cryptoApi.randomUUID === "function") return cryptoApi.randomUUID();
+
+  // randomUUID is restricted to secure contexts. getRandomValues also works
+  // over the app's supported HTTP-by-IP deployment.
+  const bytes = cryptoApi.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6]! & 0x0f) | 0x40;
+  bytes[8] = (bytes[8]! & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0"));
+  return `${hex.slice(0, 4).join("")}-${hex.slice(4, 6).join("")}-${hex.slice(6, 8).join("")}-${hex.slice(8, 10).join("")}-${hex.slice(10).join("")}`;
+}
+
 async function ensureCsrfToken() {
   if (csrfToken) return csrfToken;
   const response = await fetch("/api/v1/auth/csrf", {
