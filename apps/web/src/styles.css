@@ -1480,6 +1480,22 @@ a {
 .quiet-button:hover {
   background: var(--line);
 }
+.ledger-load-more,
+.task-load-more,
+.share-load-more,
+.account-load-more {
+  display: block;
+  margin: 18px auto;
+}
+.occurrence-load-more {
+  display: block;
+  margin: 9px auto;
+}
+.notification-pagination {
+  display: flex;
+  justify-content: center;
+  margin: 12px 0;
+}
 .small-button {
   min-height: 38px;
   padding: 0 15px;

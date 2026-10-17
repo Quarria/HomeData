@@ -23,12 +23,20 @@ function isUniqueViolation(error: unknown) {
 export class AccountsService {
   constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
-  async list() {
+  async list(
+    input: { cursor?: string | undefined; limit: number } = { limit: 30 },
+  ) {
     const accounts = await this.prisma.account.findMany({
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-      take: 100,
+      take: input.limit + 1,
+      ...(input.cursor ? { cursor: { id: input.cursor }, skip: 1 } : {}),
     });
-    return accounts.map(accountSummary);
+    const hasMore = accounts.length > input.limit;
+    const page = hasMore ? accounts.slice(0, input.limit) : accounts;
+    return {
+      items: page.map(accountSummary),
+      nextCursor: hasMore ? page.at(-1)!.id : null,
+    };
   }
 
   async create(

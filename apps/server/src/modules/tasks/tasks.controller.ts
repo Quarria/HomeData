@@ -144,6 +144,8 @@ export class TasksController {
       .object({
         space: z.enum(["personal", "family"]).default("personal"),
         familyId: z.string().uuid().optional(),
+        cursor: z.string().uuid().optional(),
+        limit: z.coerce.number().int().min(1).max(100).default(30),
       })
       .parse(query);
     return apiSuccess(
@@ -216,11 +218,18 @@ export class TasksController {
   @Get("recurring-rules/:id/occurrences")
   async listRuleOccurrences(
     @Param("id", ParseUUIDPipe) id: string,
+    @Query() query: Record<string, unknown>,
     @Req() request: AuthenticatedRequest,
   ) {
+    const input = z
+      .object({
+        cursor: z.string().uuid().optional(),
+        limit: z.coerce.number().int().min(1).max(100).default(30),
+      })
+      .parse(query);
     return apiSuccess(
       request,
-      await this.tasks.listOccurrences(id, request.account!.id),
+      await this.tasks.listOccurrences(id, request.account!.id, input),
     );
   }
 
@@ -257,10 +266,19 @@ export class TasksController {
   }
 
   @Get("notifications")
-  async notifications(@Req() request: AuthenticatedRequest) {
+  async notifications(
+    @Query() query: Record<string, unknown>,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    const input = z
+      .object({
+        cursor: z.string().uuid().optional(),
+        limit: z.coerce.number().int().min(1).max(100).default(30),
+      })
+      .parse(query);
     return apiSuccess(
       request,
-      await this.tasks.listNotifications(request.account!.id),
+      await this.tasks.listNotifications(request.account!.id, input),
     );
   }
 

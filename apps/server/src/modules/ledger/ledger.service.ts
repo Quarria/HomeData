@@ -1167,13 +1167,24 @@ export class LedgerService {
     });
   }
 
-  async audit(expenseId: string, accountId: string) {
+  async audit(
+    expenseId: string,
+    accountId: string,
+    input: { cursor?: string | undefined; limit: number } = { limit: 30 },
+  ) {
     await this.readExpense(expenseId, accountId);
-    return this.prisma.auditEvent.findMany({
+    const rows = await this.prisma.auditEvent.findMany({
       where: { subjectType: "EXPENSE", subjectId: expenseId },
-      orderBy: { createdAt: "desc" },
-      take: 50,
-      select: { action: true, details: true, createdAt: true },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: input.limit + 1,
+      ...(input.cursor ? { cursor: { id: input.cursor }, skip: 1 } : {}),
+      select: { id: true, action: true, details: true, createdAt: true },
     });
+    const hasMore = rows.length > input.limit;
+    const items = hasMore ? rows.slice(0, input.limit) : rows;
+    return {
+      items,
+      nextCursor: hasMore ? items.at(-1)!.id : null,
+    };
   }
 }

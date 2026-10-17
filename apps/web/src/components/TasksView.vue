@@ -51,6 +51,7 @@ type Rule = {
   status: "ACTIVE" | "PAUSED";
   version: number;
   canManage: boolean;
+  occurrencesNextCursor: string | null;
   occurrences: Occurrence[];
 };
 type Category = { id: string; code: string; name: string };
@@ -69,6 +70,10 @@ const rules = ref<Rule[]>([]);
 const categories = ref<Category[]>([]);
 const statusFilter = ref<"open" | "done" | "all">("open");
 const loading = ref(false);
+const loadingMore = ref(false);
+const taskNextCursor = ref<string | null>(null);
+const ruleNextCursor = ref<string | null>(null);
+const occurrenceLoading = ref<Record<string, boolean>>({});
 const saving = ref(false);
 const error = ref("");
 const notice = ref("");
@@ -118,17 +123,37 @@ function explain(reason: unknown, fallback: string) {
   return reason instanceof ApiClientError ? reason.message : fallback;
 }
 
-async function load() {
-  loading.value = true;
+async function load(cursor?: string, append = false) {
+  if (append) loadingMore.value = true;
+  else {
+    loading.value = true;
+    taskNextCursor.value = null;
+    ruleNextCursor.value = null;
+  }
   error.value = "";
   try {
-    const query = new URLSearchParams({ space: session.activeSpace });
+    const query = new URLSearchParams({
+      space: session.activeSpace,
+      limit: "30",
+    });
     if (familyId.value) query.set("familyId", familyId.value);
     if (section.value === "tasks") {
       query.set("status", statusFilter.value);
-      tasks.value = await apiRequest<Task[]>(`/tasks?${query}`);
+      if (cursor) query.set("cursor", cursor);
+      const page = await apiRequest<{
+        items: Task[];
+        nextCursor: string | null;
+      }>(`/tasks?${query}`);
+      tasks.value = append ? [...tasks.value, ...page.items] : page.items;
+      taskNextCursor.value = page.nextCursor;
     } else {
-      rules.value = await apiRequest<Rule[]>(`/recurring-rules?${query}`);
+      if (cursor) query.set("cursor", cursor);
+      const page = await apiRequest<{
+        items: Rule[];
+        nextCursor: string | null;
+      }>(`/recurring-rules?${query}`);
+      rules.value = append ? [...rules.value, ...page.items] : page.items;
+      ruleNextCursor.value = page.nextCursor;
       if (!categories.value.length)
         categories.value = await apiRequest<Category[]>("/categories");
     }
@@ -136,6 +161,33 @@ async function load() {
     error.value = explain(reason, "待办信息暂时无法加载。");
   } finally {
     loading.value = false;
+    loadingMore.value = false;
+  }
+}
+
+function loadMore() {
+  const cursor =
+    section.value === "tasks" ? taskNextCursor.value : ruleNextCursor.value;
+  if (cursor && !loadingMore.value) void load(cursor, true);
+}
+
+async function loadMoreOccurrences(rule: Rule) {
+  const cursor = rule.occurrencesNextCursor;
+  if (!cursor || occurrenceLoading.value[rule.id]) return;
+  occurrenceLoading.value[rule.id] = true;
+  try {
+    const page = await apiRequest<{
+      items: Occurrence[];
+      nextCursor: string | null;
+    }>(
+      `/recurring-rules/${rule.id}/occurrences?cursor=${encodeURIComponent(cursor)}&limit=30`,
+    );
+    rule.occurrences.push(...page.items);
+    rule.occurrencesNextCursor = page.nextCursor;
+  } catch (reason) {
+    error.value = explain(reason, "历史期次暂时无法加载。");
+  } finally {
+    occurrenceLoading.value[rule.id] = false;
   }
 }
 
@@ -151,9 +203,17 @@ onMounted(async () => {
   await load();
   if (props.initialAction === "create") openTask();
   if (props.initialAction === "pay" && canWrite.value) {
-    const target = rules.value
+    let target = rules.value
       .flatMap((rule) => rule.occurrences)
       .find((item) => item.id === props.targetId);
+    while (!target && ruleNextCursor.value) {
+      const cursor = ruleNextCursor.value;
+      await load(cursor, true);
+      if (ruleNextCursor.value === cursor) break;
+      target = rules.value
+        .flatMap((rule) => rule.occurrences)
+        .find((item) => item.id === props.targetId);
+    }
     if (target?.status === "PENDING") openPayment(target);
   }
   if (props.initialAction === "view" && props.targetId) {
@@ -442,6 +502,14 @@ async function payOccurrence() {
           </div>
         </article>
       </TransitionGroup>
+      <button
+        v-if="taskNextCursor"
+        class="quiet-button task-load-more"
+        :disabled="loadingMore"
+        @click="loadMore"
+      >
+        {{ loadingMore ? "正在加载…" : "加载更多待办" }}
+      </button>
       <div v-if="!tasks.length" class="empty-state">
         <span class="empty-symbol">◷</span
         ><strong>{{
@@ -513,6 +581,14 @@ async function payOccurrence() {
           <div v-else class="no-occurrence">
             期次会在个人提醒设置的提前日期生成；实际到期日按上方周期规则计算。
           </div>
+          <button
+            v-if="rule.occurrencesNextCursor"
+            class="text-button occurrence-load-more"
+            :disabled="occurrenceLoading[rule.id]"
+            @click="loadMoreOccurrences(rule)"
+          >
+            {{ occurrenceLoading[rule.id] ? "正在加载…" : "加载更早期次" }}
+          </button>
           <footer v-if="rule.canManage" class="fixed-card-actions">
             <button class="quiet-button" @click="openRule(rule)">
               编辑规则</button
@@ -522,7 +598,15 @@ async function payOccurrence() {
           </footer>
         </article>
       </div>
-      <div v-else class="empty-state">
+      <button
+        v-if="ruleNextCursor"
+        class="quiet-button task-load-more"
+        :disabled="loadingMore"
+        @click="loadMore"
+      >
+        {{ loadingMore ? "正在加载…" : "加载更多固定费用" }}
+      </button>
+      <div v-if="!rules.length" class="empty-state">
         <span class="empty-symbol">⌁</span><strong>还没有固定费用</strong>
         <p>
           添加水电燃气、房租等周期项目，到期前提醒；确认付款后才会记入账本。

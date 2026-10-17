@@ -169,11 +169,18 @@ export class LedgerController {
   @Get("expenses/:id/audit")
   async audit(
     @Param("id", ParseUUIDPipe) expenseId: string,
+    @Query() query: Record<string, unknown>,
     @Req() request: AuthenticatedRequest,
   ) {
+    const input = z
+      .object({
+        cursor: z.string().uuid().optional(),
+        limit: z.coerce.number().int().min(1).max(100).default(30),
+      })
+      .parse(query);
     return apiSuccess(
       request,
-      await this.ledger.audit(expenseId, request.account!.id),
+      await this.ledger.audit(expenseId, request.account!.id, input),
     );
   }
 

@@ -135,6 +135,8 @@ const shareOpen = ref(false);
 const shareBusy = ref(false);
 const shareError = ref("");
 const shareItems = ref<ShareItem[]>([]);
+const shareNextCursor = ref<string | null>(null);
+const shareLoadingMore = ref(false);
 const shareExpiry = ref<1 | 7 | 30>(7);
 const sharePasscode = ref("");
 const createdShareUrl = ref("");
@@ -377,13 +379,42 @@ async function openShares() {
   if (!shareOpen.value) return;
   shareError.value = "";
   try {
-    shareItems.value = await apiRequest<ShareItem[]>("/shares");
+    await loadShares();
   } catch (reason) {
     shareError.value =
       reason instanceof ApiClientError
         ? reason.message
         : "分享列表暂时无法读取。";
   }
+}
+
+async function loadShares(cursor?: string, append = false) {
+  if (append) shareLoadingMore.value = true;
+  else shareNextCursor.value = null;
+  try {
+    const page = await apiRequest<{
+      items: ShareItem[];
+      nextCursor: string | null;
+    }>(
+      `/shares?limit=30${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`,
+    );
+    shareItems.value = append
+      ? [...shareItems.value, ...page.items]
+      : page.items;
+    shareNextCursor.value = page.nextCursor;
+  } finally {
+    shareLoadingMore.value = false;
+  }
+}
+
+function loadMoreShares() {
+  if (shareNextCursor.value && !shareLoadingMore.value)
+    void loadShares(shareNextCursor.value, true).catch((reason: unknown) => {
+      shareError.value =
+        reason instanceof ApiClientError
+          ? reason.message
+          : "分享列表暂时无法读取。";
+    });
 }
 
 async function createShare() {
@@ -406,7 +437,7 @@ async function createShare() {
     });
     createdShareUrl.value = `${window.location.origin}${created.path}`;
     sharePasscode.value = "";
-    shareItems.value = await apiRequest<ShareItem[]>("/shares");
+    await loadShares();
   } catch (reason) {
     shareError.value =
       reason instanceof ApiClientError
@@ -431,7 +462,7 @@ async function revokeShare(item: ShareItem) {
   shareError.value = "";
   try {
     await postJson(`/shares/${item.id}/revoke`, { version: item.version });
-    shareItems.value = await apiRequest<ShareItem[]>("/shares");
+    await loadShares();
   } catch (reason) {
     shareError.value =
       reason instanceof ApiClientError
@@ -618,6 +649,14 @@ onMounted(() => void load());
           </div>
         </div>
       </div>
+      <button
+        v-if="shareNextCursor"
+        class="quiet-button share-load-more"
+        :disabled="shareLoadingMore"
+        @click="loadMoreShares"
+      >
+        {{ shareLoadingMore ? "正在加载…" : "加载更多分享记录" }}
+      </button>
     </section>
 
     <section

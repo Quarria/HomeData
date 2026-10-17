@@ -20,6 +20,8 @@ const message = ref("");
 const error = ref("");
 const accountsOpen = ref(false);
 const accounts = ref<AccountSummary[]>([]);
+const accountNextCursor = ref<string | null>(null);
+const accountLoadingMore = ref(false);
 const accountForm = ref({ username: "", nickname: "", initialPassword: "" });
 const accountPasswords = ref<Record<string, string>>({});
 const nickname = ref("");
@@ -160,9 +162,33 @@ async function loadAccounts() {
 
 async function refreshAccounts() {
   try {
-    accounts.value = await apiRequest<AccountSummary[]>("/admin/accounts");
+    const page = await apiRequest<{
+      items: AccountSummary[];
+      nextCursor: string | null;
+    }>("/admin/accounts?limit=30");
+    accounts.value = page.items;
+    accountNextCursor.value = page.nextCursor;
   } catch (reason) {
     showError(reason);
+  }
+}
+
+async function loadMoreAccounts() {
+  if (!accountNextCursor.value || accountLoadingMore.value) return;
+  accountLoadingMore.value = true;
+  try {
+    const page = await apiRequest<{
+      items: AccountSummary[];
+      nextCursor: string | null;
+    }>(
+      `/admin/accounts?limit=30&cursor=${encodeURIComponent(accountNextCursor.value)}`,
+    );
+    accounts.value.push(...page.items);
+    accountNextCursor.value = page.nextCursor;
+  } catch (reason) {
+    showError(reason);
+  } finally {
+    accountLoadingMore.value = false;
   }
 }
 
@@ -574,6 +600,14 @@ onMounted(() => void loadReminderPreference());
                 </button>
               </article>
             </div>
+            <button
+              v-if="accountNextCursor"
+              class="quiet-button account-load-more"
+              :disabled="accountLoadingMore"
+              @click="loadMoreAccounts"
+            >
+              {{ accountLoadingMore ? "正在加载…" : "加载更多账号" }}
+            </button>
           </template>
         </section>
       </div>

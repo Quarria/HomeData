@@ -55,8 +55,8 @@ type RecurringPatch = {
 const recurringRuleListInclude = {
   category: { select: { id: true, name: true, code: true } },
   occurrences: {
-    orderBy: { dueOn: "desc" },
-    take: 12,
+    orderBy: [{ dueOn: "desc" }, { id: "desc" }],
+    take: 13,
     include: {
       activeExpense: { select: { id: true, payerId: true, amountCents: true } },
       manager: { select: { id: true, nickname: true } },
@@ -190,6 +190,8 @@ export class TasksService implements OnModuleInit, OnModuleDestroy {
       space: "personal" | "family";
       familyId?: string | undefined;
       status: "all" | "open" | "done";
+      cursor?: string | undefined;
+      limit: number;
     },
   ) {
     let currentFamilyMembershipId: string | null = null;
@@ -218,27 +220,38 @@ export class TasksService implements OnModuleInit, OnModuleDestroy {
           assignee: { select: { id: true, nickname: true } },
           completedBy: { select: { id: true, nickname: true } },
         },
-        orderBy: [{ status: "asc" }, { dueOn: "asc" }, { createdAt: "desc" }],
-        take: 100,
+        orderBy: [
+          { status: "asc" },
+          { dueOn: "asc" },
+          { createdAt: "desc" },
+          { id: "desc" },
+        ],
+        take: input.limit + 1,
+        ...(input.cursor ? { cursor: { id: input.cursor }, skip: 1 } : {}),
       });
-      return rows.map((task) => ({
-        id: task.id,
-        title: task.title,
-        description: task.description,
-        dueOn: dateString(task.dueOn),
-        familyId: task.familyId,
-        status: task.status,
-        manager: task.manager,
-        assignee: task.assignee,
-        completedBy: task.completedBy,
-        completedAt: task.completedAt?.toISOString() ?? null,
-        version: task.version,
-        canManage:
-          task.managerId === accountId &&
-          (!task.familyId ||
-            task.managerMembershipId === currentFamilyMembershipId),
-        canComplete: task.status === "OPEN",
-      }));
+      const hasMore = rows.length > input.limit;
+      const page = hasMore ? rows.slice(0, input.limit) : rows;
+      return {
+        items: page.map((task) => ({
+          id: task.id,
+          title: task.title,
+          description: task.description,
+          dueOn: dateString(task.dueOn),
+          familyId: task.familyId,
+          status: task.status,
+          manager: task.manager,
+          assignee: task.assignee,
+          completedBy: task.completedBy,
+          completedAt: task.completedAt?.toISOString() ?? null,
+          version: task.version,
+          canManage:
+            task.managerId === accountId &&
+            (!task.familyId ||
+              task.managerMembershipId === currentFamilyMembershipId),
+          canComplete: task.status === "OPEN",
+        })),
+        nextCursor: hasMore ? page.at(-1)!.id : null,
+      };
     });
   }
 
@@ -507,7 +520,12 @@ export class TasksService implements OnModuleInit, OnModuleDestroy {
 
   async listRecurring(
     accountId: string,
-    input: { space: "personal" | "family"; familyId?: string | undefined },
+    input: {
+      space: "personal" | "family";
+      familyId?: string | undefined;
+      cursor?: string | undefined;
+      limit: number;
+    },
   ) {
     if (input.space === "family") {
       const membership = await this.prisma.membership.findFirst({
@@ -530,46 +548,61 @@ export class TasksService implements OnModuleInit, OnModuleDestroy {
             ? { familyId: null, creatorId: accountId }
             : { familyId: input.familyId! },
         include: recurringRuleListInclude,
-        orderBy: [{ status: "asc" }, { anchorOn: "asc" }],
+        orderBy: [{ status: "asc" }, { anchorOn: "asc" }, { id: "desc" }],
+        take: input.limit + 1,
+        ...(input.cursor ? { cursor: { id: input.cursor }, skip: 1 } : {}),
       });
-      return rows.map((rule) => ({
-        id: rule.id,
-        title: rule.title,
-        familyId: rule.familyId,
-        category: rule.category,
-        frequency: rule.frequency,
-        anchorOn: dateString(rule.anchorOn),
-        expectedAmount:
-          rule.expectedCents === null ? null : money(rule.expectedCents),
-        status: rule.status,
-        version: rule.version,
-        canManage:
-          rule.managerId === accountId &&
-          (!rule.familyId ||
-            rule.managerMembershipId === currentMembership?.id),
-        occurrences: rule.occurrences.map((occurrence) => ({
-          id: occurrence.id,
-          periodKey: occurrence.periodKey,
-          dueOn: dateString(occurrence.dueOn),
-          title: occurrence.titleSnapshot,
-          status: occurrence.status,
-          version: occurrence.version,
-          amount:
-            occurrence.activeExpense?.amountCents === undefined
-              ? null
-              : money(occurrence.activeExpense.amountCents),
-          payerId: occurrence.activeExpense?.payerId ?? null,
-          manager: occurrence.manager,
-          canPay: occurrence.status === "PENDING",
-          canSkip:
-            occurrence.status === "PENDING" &&
-            occurrence.managerId === accountId,
+      const hasMore = rows.length > input.limit;
+      const page = hasMore ? rows.slice(0, input.limit) : rows;
+      return {
+        items: page.map((rule) => ({
+          id: rule.id,
+          title: rule.title,
+          familyId: rule.familyId,
+          category: rule.category,
+          frequency: rule.frequency,
+          anchorOn: dateString(rule.anchorOn),
+          expectedAmount:
+            rule.expectedCents === null ? null : money(rule.expectedCents),
+          status: rule.status,
+          version: rule.version,
+          canManage:
+            rule.managerId === accountId &&
+            (!rule.familyId ||
+              rule.managerMembershipId === currentMembership?.id),
+          occurrencesNextCursor:
+            rule.occurrences.length > 12
+              ? (rule.occurrences[11]?.id ?? null)
+              : null,
+          occurrences: rule.occurrences.slice(0, 12).map((occurrence) => ({
+            id: occurrence.id,
+            periodKey: occurrence.periodKey,
+            dueOn: dateString(occurrence.dueOn),
+            title: occurrence.titleSnapshot,
+            status: occurrence.status,
+            version: occurrence.version,
+            amount:
+              occurrence.activeExpense?.amountCents === undefined
+                ? null
+                : money(occurrence.activeExpense.amountCents),
+            payerId: occurrence.activeExpense?.payerId ?? null,
+            manager: occurrence.manager,
+            canPay: occurrence.status === "PENDING",
+            canSkip:
+              occurrence.status === "PENDING" &&
+              occurrence.managerId === accountId,
+          })),
         })),
-      }));
+        nextCursor: hasMore ? page.at(-1)!.id : null,
+      };
     });
   }
 
-  async listOccurrences(ruleId: string, accountId: string) {
+  async listOccurrences(
+    ruleId: string,
+    accountId: string,
+    input: { cursor?: string | undefined; limit: number } = { limit: 30 },
+  ) {
     return this.prisma.$transaction(async (tx) => {
       const rule = await tx.recurringRule.findUnique({
         where: { id: ruleId },
@@ -589,30 +622,37 @@ export class TasksService implements OnModuleInit, OnModuleDestroy {
       }
       const rows = await tx.occurrence.findMany({
         where: { ruleId },
-        orderBy: { dueOn: "desc" },
-        take: 100,
+        orderBy: [{ dueOn: "desc" }, { id: "desc" }],
+        take: input.limit + 1,
+        ...(input.cursor ? { cursor: { id: input.cursor }, skip: 1 } : {}),
         include: {
           activeExpense: { select: { amountCents: true, payerId: true } },
           manager: { select: { id: true, nickname: true } },
         },
       });
-      return rows.map((occurrence) => ({
-        id: occurrence.id,
-        periodKey: occurrence.periodKey,
-        dueOn: dateString(occurrence.dueOn),
-        title: occurrence.titleSnapshot,
-        status: occurrence.status,
-        version: occurrence.version,
-        amount:
-          occurrence.activeExpense?.amountCents === undefined
-            ? null
-            : money(occurrence.activeExpense.amountCents),
-        payerId: occurrence.activeExpense?.payerId ?? null,
-        manager: occurrence.manager,
-        canPay: occurrence.status === "PENDING",
-        canSkip:
-          occurrence.status === "PENDING" && occurrence.managerId === accountId,
-      }));
+      const hasMore = rows.length > input.limit;
+      const page = hasMore ? rows.slice(0, input.limit) : rows;
+      return {
+        items: page.map((occurrence) => ({
+          id: occurrence.id,
+          periodKey: occurrence.periodKey,
+          dueOn: dateString(occurrence.dueOn),
+          title: occurrence.titleSnapshot,
+          status: occurrence.status,
+          version: occurrence.version,
+          amount:
+            occurrence.activeExpense?.amountCents === undefined
+              ? null
+              : money(occurrence.activeExpense.amountCents),
+          payerId: occurrence.activeExpense?.payerId ?? null,
+          manager: occurrence.manager,
+          canPay: occurrence.status === "PENDING",
+          canSkip:
+            occurrence.status === "PENDING" &&
+            occurrence.managerId === accountId,
+        })),
+        nextCursor: hasMore ? page.at(-1)!.id : null,
+      };
     });
   }
 
@@ -1006,16 +1046,22 @@ export class TasksService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
-  async listNotifications(accountId: string) {
+  async listNotifications(
+    accountId: string,
+    input: { cursor?: string | undefined; limit: number } = { limit: 30 },
+  ) {
     return this.prisma.$transaction(async (tx) => {
       const messages = await tx.inboxMessage.findMany({
         where: { recipientId: accountId },
-        orderBy: { slotAt: "desc" },
-        take: 60,
+        orderBy: [{ slotAt: "desc" }, { id: "desc" }],
+        take: input.limit + 1,
+        ...(input.cursor ? { cursor: { id: input.cursor }, skip: 1 } : {}),
         include: { items: true },
       });
+      const hasMore = messages.length > input.limit;
+      const page = hasMore ? messages.slice(0, input.limit) : messages;
       const visible = [];
-      for (const message of messages) {
+      for (const message of page) {
         const items = [];
         for (const item of message.items) {
           if (item.subjectType === "TASK") {
@@ -1096,7 +1142,10 @@ export class TasksService implements OnModuleInit, OnModuleDestroy {
           });
         }
       }
-      return visible;
+      return {
+        items: visible,
+        nextCursor: hasMore ? page.at(-1)!.id : null,
+      };
     });
   }
 

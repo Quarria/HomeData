@@ -126,10 +126,10 @@ describe("tasks, recurring fees, and inbox reminders", () => {
     expect(cycle.queued).toBe(4);
     const adminMessages = await tasks.listNotifications(adminId);
     const memberMessages = await tasks.listNotifications(memberId);
-    expect(adminMessages[0]?.items).toHaveLength(2);
-    expect(memberMessages[0]?.items).toHaveLength(2);
+    expect(adminMessages.items[0]?.items).toHaveLength(2);
+    expect(memberMessages.items[0]?.items).toHaveLength(2);
 
-    await tasks.markNotificationRead(adminMessages[0]!.id, adminId);
+    await tasks.markNotificationRead(adminMessages.items[0]!.id, adminId);
     await tasks.createTask(memberId, {
       title: "确认物业缴费",
       dueOn: "2026-10-18",
@@ -140,11 +140,12 @@ describe("tasks, recurring fees, and inbox reminders", () => {
     );
     expect(laterCycle.queued).toBe(2);
     const refreshedAdminMessages = await tasks.listNotifications(adminId);
-    expect(refreshedAdminMessages).toHaveLength(2);
-    expect(refreshedAdminMessages[0]?.items).toHaveLength(1);
-    expect(refreshedAdminMessages[1]?.items).toHaveLength(2);
+    expect(refreshedAdminMessages.items).toHaveLength(2);
+    expect(refreshedAdminMessages.items[0]?.items).toHaveLength(1);
+    expect(refreshedAdminMessages.items[1]?.items).toHaveLength(2);
 
-    const occurrence = (await tasks.listOccurrences(rule.id, memberId))[0]!;
+    const occurrence = (await tasks.listOccurrences(rule.id, memberId))
+      .items[0]!;
     const payment = await tasks.payOccurrence(
       occurrence.id,
       memberId,

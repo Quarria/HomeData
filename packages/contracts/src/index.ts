@@ -213,6 +213,8 @@ export const taskListQuerySchema = z.object({
   space: z.enum(["personal", "family"]).default("personal"),
   familyId: z.string().uuid().optional(),
   status: z.enum(["all", "open", "done"]).default("open"),
+  cursor: z.string().uuid().optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(30),
 });
 
 export const reportQuerySchema = z

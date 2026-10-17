@@ -79,6 +79,8 @@ const originOptions = [
 const categories = ref<Category[]>([]);
 const expenses = ref<Expense[]>([]);
 const loading = ref(false);
+const loadingMore = ref(false);
+const nextCursor = ref<string | null>(null);
 const error = ref("");
 const notice = ref("");
 const origin = ref<"all" | "personal" | "family">("all");
@@ -127,7 +129,7 @@ const queryString = computed(() => {
     space: session.activeSpace,
     origin: origin.value,
     deleted: String(deleted.value),
-    limit: "100",
+    limit: "30",
   });
   if (session.activeSpace === "family" && session.family)
     query.set("familyId", session.family.id);
@@ -140,8 +142,12 @@ const sectionLabel = computed(() =>
   deleted.value ? "已删除记录" : "支出明细",
 );
 
-async function load() {
-  loading.value = true;
+async function load(cursor?: string, append = false) {
+  if (append) loadingMore.value = true;
+  else {
+    loading.value = true;
+    nextCursor.value = null;
+  }
   error.value = "";
   try {
     if (!categories.value.length)
@@ -149,14 +155,24 @@ async function load() {
     const listData = await apiRequest<{
       items: Expense[];
       nextCursor: string | null;
-    }>(`/expenses?${queryString.value}`);
-    expenses.value = listData.items;
+    }>(
+      `/expenses?${queryString.value}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`,
+    );
+    expenses.value = append
+      ? [...expenses.value, ...listData.items]
+      : listData.items;
+    nextCursor.value = listData.nextCursor;
   } catch (reason) {
     error.value =
       reason instanceof ApiClientError ? reason.message : "账本暂时无法加载。";
   } finally {
     loading.value = false;
+    loadingMore.value = false;
   }
+}
+
+function loadMore() {
+  if (nextCursor.value && !loadingMore.value) void load(nextCursor.value, true);
 }
 
 watch(queryString, () => void load());
@@ -595,7 +611,9 @@ function displayDate(value: string) {
       <div class="ledger-paper-heading">
         <strong
           >{{ sectionLabel
-          }}<small v-if="!loading"> · {{ expenses.length }} 笔</small></strong
+          }}<small v-if="!loading">
+            · {{ nextCursor ? `已加载 ${expenses.length} 笔` : `${expenses.length} 笔` }}</small
+        ></strong
         ><span>人民币 / CNY</span>
       </div>
       <div v-if="loading" class="ledger-empty">正在读取账本…</div>
@@ -638,6 +656,14 @@ function displayDate(value: string) {
           ></span
         >
         <span class="ledger-row-detail">{{ deleted ? "恢复" : "详情" }} ›</span>
+      </button>
+      <button
+        v-if="nextCursor && !loading"
+        class="quiet-button ledger-load-more"
+        :disabled="loadingMore"
+        @click="loadMore"
+      >
+        {{ loadingMore ? "正在加载…" : "加载更多记录" }}
       </button>
     </div>
     <Transition name="modal"

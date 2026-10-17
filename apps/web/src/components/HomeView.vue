@@ -126,8 +126,12 @@ async function load() {
   report.set("basis", "net");
   const results = await Promise.allSettled([
     apiRequest<{ net: string; hasData: boolean }>(`/reports/summary?${report}`),
-    apiRequest<Task[]>(`/tasks?${params}`),
-    apiRequest<Rule[]>(`/recurring-rules?${params}`),
+    apiRequest<{ items: Task[]; nextCursor: string | null }>(
+      `/tasks?${params}&limit=30`,
+    ),
+    apiRequest<{ items: Rule[]; nextCursor: string | null }>(
+      `/recurring-rules?${params}&limit=30`,
+    ),
   ]);
   if (currentId !== requestId) return;
   const [total, tasks, rules] = results;
@@ -136,7 +140,7 @@ async function load() {
   horizon.setDate(horizon.getDate() + 7);
   const candidates: Attention[] = [
     ...(tasks.status === "fulfilled"
-      ? tasks.value
+      ? tasks.value.items
           .filter((task) => task.status === "OPEN")
           .map((task): Attention => ({
             id: task.id,
@@ -146,7 +150,7 @@ async function load() {
           }))
       : []),
     ...(rules.status === "fulfilled"
-      ? rules.value.flatMap((rule) =>
+      ? rules.value.items.flatMap((rule) =>
           rule.occurrences
             .filter((item) => item.status === "PENDING")
             .map((item): Attention => ({

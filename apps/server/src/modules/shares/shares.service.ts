@@ -463,19 +463,28 @@ export class SharesService {
     };
   }
 
-  async listOwned(ownerId: string) {
+  async listOwned(
+    ownerId: string,
+    input: { cursor?: string | undefined; limit: number } = { limit: 30 },
+  ) {
     const snapshots = await this.prisma.shareSnapshot.findMany({
       where: { ownerId },
-      orderBy: { generatedAt: "desc" },
-      take: 100,
+      orderBy: [{ generatedAt: "desc" }, { id: "desc" }],
+      take: input.limit + 1,
+      ...(input.cursor ? { cursor: { id: input.cursor }, skip: 1 } : {}),
     });
+    const hasMore = snapshots.length > input.limit;
+    const page = hasMore ? snapshots.slice(0, input.limit) : snapshots;
     const items = [];
-    for (const snapshot of snapshots) {
+    for (const snapshot of page) {
       items.push(
         await this.managementDto(await this.owned(snapshot.id, ownerId)),
       );
     }
-    return items;
+    return {
+      items,
+      nextCursor: hasMore ? page.at(-1)!.id : null,
+    };
   }
 
   async getOwned(snapshotId: string, ownerId: string) {

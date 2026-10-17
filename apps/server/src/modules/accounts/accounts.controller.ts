@@ -5,8 +5,10 @@ import {
   Inject,
   Param,
   Post,
+  Query,
   Req,
 } from "@nestjs/common";
+import { z } from "zod";
 import {
   adminAccountCreateRequestSchema,
   adminPasswordResetRequestSchema,
@@ -25,8 +27,17 @@ export class AccountsController {
   ) {}
 
   @Get()
-  async list(@Req() request: AuthenticatedRequest) {
-    return apiSuccess(request, await this.accounts.list());
+  async list(
+    @Query() query: Record<string, unknown>,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    const input = z
+      .object({
+        cursor: z.string().uuid().optional(),
+        limit: z.coerce.number().int().min(1).max(100).default(30),
+      })
+      .parse(query);
+    return apiSuccess(request, await this.accounts.list(input));
   }
 
   @Post()

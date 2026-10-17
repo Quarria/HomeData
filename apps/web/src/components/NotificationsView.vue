@@ -24,14 +24,27 @@ const emit = defineEmits<{
   unreadChange: [count: number];
 }>();
 const messages = ref<Message[]>([]);
+const nextCursor = ref<string | null>(null);
 const loading = ref(true);
+const loadingMore = ref(false);
 const error = ref("");
 
-async function load() {
-  loading.value = true;
+async function load(cursor?: string, append = false) {
+  if (append) loadingMore.value = true;
+  else {
+    loading.value = true;
+    nextCursor.value = null;
+  }
   error.value = "";
   try {
-    messages.value = await apiRequest<Message[]>("/notifications");
+    const page = await apiRequest<{
+      items: Message[];
+      nextCursor: string | null;
+    }>(
+      `/notifications?limit=30${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`,
+    );
+    messages.value = append ? [...messages.value, ...page.items] : page.items;
+    nextCursor.value = page.nextCursor;
     emit(
       "unreadChange",
       messages.value.reduce((total, message) => total + message.unreadCount, 0),
@@ -41,9 +54,14 @@ async function load() {
       reason instanceof ApiClientError ? reason.message : "消息暂时无法加载。";
   } finally {
     loading.value = false;
+    loadingMore.value = false;
   }
 }
 onMounted(() => void load());
+
+function loadMore() {
+  if (nextCursor.value && !loadingMore.value) void load(nextCursor.value, true);
+}
 
 async function openMessage(message: Message) {
   if (!message.readAt) {
@@ -83,11 +101,16 @@ async function openMessage(message: Message) {
     </header>
     <p v-if="error" class="inline-error">{{ error }}</p>
     <div v-if="loading" class="notification-empty">正在读取提醒…</div>
-    <div v-else-if="!messages.length" class="notification-empty">
+    <div v-else-if="!messages.length && !nextCursor" class="notification-empty">
       <span>◷</span><strong>目前没有新的提醒</strong
       ><small>待办和固定费用将在提醒时间显示在这里。</small>
     </div>
-    <div v-else class="notification-list">
+    <div v-if="!loading && nextCursor" class="notification-pagination">
+      <button class="quiet-button" :disabled="loadingMore" @click="loadMore">
+        {{ loadingMore ? "正在加载…" : "加载更早提醒" }}
+      </button>
+    </div>
+    <div v-if="!loading && messages.length" class="notification-list">
       <button
         v-for="message in messages"
         :key="message.id"

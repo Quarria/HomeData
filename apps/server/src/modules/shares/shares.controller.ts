@@ -5,6 +5,7 @@ import {
   Inject,
   Param,
   Post,
+  Query,
   Req,
   Res,
 } from "@nestjs/common";
@@ -18,6 +19,7 @@ import { readCookies, usesSecureCookies } from "../../shared/auth/cookies.js";
 import { Public } from "../../shared/auth/auth-metadata.js";
 import { apiSuccess, parseBody } from "../../shared/http/api-response.js";
 import { SharesService } from "./shares.service.js";
+import { z } from "zod";
 
 const shareSessionCookieName = () =>
   usesSecureCookies() ? "__Host-hd_share_session" : "hd_share_session";
@@ -31,10 +33,19 @@ export class SharesController {
   constructor(@Inject(SharesService) private readonly shares: SharesService) {}
 
   @Get("shares")
-  async list(@Req() request: AuthenticatedRequest) {
+  async list(
+    @Query() query: Record<string, unknown>,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    const input = z
+      .object({
+        cursor: z.string().uuid().optional(),
+        limit: z.coerce.number().int().min(1).max(100).default(30),
+      })
+      .parse(query);
     return apiSuccess(
       request,
-      await this.shares.listOwned(request.account!.id),
+      await this.shares.listOwned(request.account!.id, input),
     );
   }
 

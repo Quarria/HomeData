@@ -332,7 +332,7 @@ test("creates a personal task through the responsive task form", async ({
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({ data: [] }),
+        body: JSON.stringify({ data: { items: [], nextCursor: null } }),
       });
       return;
     }

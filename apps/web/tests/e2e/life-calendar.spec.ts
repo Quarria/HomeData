@@ -164,44 +164,49 @@ async function setup(page: Page) {
         feeAdvanceDays: 3,
         overdueEnabled: true,
       });
-    if (endpoint === "/notifications") return ok([]);
+    if (endpoint === "/notifications")
+      return ok({ items: [], nextCursor: null });
     if (endpoint === "/recurring-rules")
-      return ok([
-        {
-          id: "rule-1",
-          title: "个人会员订阅",
-          status: "ACTIVE",
-          familyId: null,
-          category,
-          frequency: "MONTHLY",
-          anchorOn: "2026-10-15",
-          expectedAmount: "25",
-          version: 1,
-          canManage: true,
-          occurrences: [
-            {
-              id: "fee-1",
-              title: "个人会员订阅",
-              dueOn: "2026-10-15",
-              periodKey: "2026-10",
-              status: "PENDING",
-              version: 1,
-              amount: null,
-              payerId: null,
-              manager: account,
-              canPay: true,
-              canSkip: true,
-            },
-          ],
-        },
-      ]);
+      return ok({
+        items: [
+          {
+            id: "rule-1",
+            title: "个人会员订阅",
+            status: "ACTIVE",
+            familyId: null,
+            category,
+            frequency: "MONTHLY",
+            anchorOn: "2026-10-15",
+            expectedAmount: "25",
+            version: 1,
+            canManage: true,
+            occurrences: [
+              {
+                id: "fee-1",
+                title: "个人会员订阅",
+                dueOn: "2026-10-15",
+                periodKey: "2026-10",
+                status: "PENDING",
+                version: 1,
+                amount: null,
+                payerId: null,
+                manager: account,
+                canPay: true,
+                canSkip: true,
+              },
+            ],
+          },
+        ],
+        nextCursor: null,
+      });
     if (endpoint === "/tasks" && request.method() === "GET")
-      return ok(
-        state.tasks.filter(
+      return ok({
+        items: state.tasks.filter(
           (item) =>
             url.searchParams.get("status") !== "open" || item.status === "OPEN",
         ),
-      );
+        nextCursor: null,
+      });
     if (endpoint === "/tasks/task-1/complete") {
       const currentTask = state.tasks.find((item) => item.id === "task-1");
       if (currentTask) currentTask.status = "DONE";
