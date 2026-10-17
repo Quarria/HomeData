@@ -6,6 +6,7 @@ import {
   newIdempotencyKey,
   postJson,
 } from "../api/client";
+import SegmentedControl from "./SegmentedControl.vue";
 import { useSessionStore } from "../stores/session";
 
 type Period = "day" | "month" | "year";
@@ -104,8 +105,23 @@ const originOptions = [
   ["personal", "个人费用"],
   ["family", "家庭费用"],
 ] as const;
+const periodSegments = periodOptions.map(([value, label]) => ({
+  value,
+  label,
+}));
+const originSegments = originOptions.map(([value, label]) => ({
+  value,
+  label,
+}));
+const basisSegments = [
+  { value: "net", label: "净支出" },
+  { value: "expense", label: "原始支出" },
+];
 const summary = ref<Summary | null>(null);
 const points = ref<Point[]>([]);
+const chartKey = computed(() =>
+  points.value.map((point) => `${point.period}:${point.value}`).join("|"),
+);
 const categories = ref<Category[]>([]);
 const members = ref<Member[]>([]);
 const details = ref<Detail[]>([]);
@@ -205,16 +221,21 @@ const chart = computed(() => {
   const max = rawMin === 0 && rawMax === 0 ? 1 : Math.max(0, rawMax);
   const spread = Math.max(1, max - min);
   const y = (value: number) => 18 + ((max - value) / spread) * 150;
+  const ticks = Array.from({ length: 5 }, (_, index) => {
+    const value = max - ((max - min) * index) / 4;
+    return { value, y: y(value) };
+  });
   const coords = visiblePoints.value.map((point, index) => {
     const x =
       visiblePoints.value.length <= 1
-        ? 360
-        : 42 + (index * 636) / (visiblePoints.value.length - 1);
+        ? 400
+        : 102 + (index * 596) / (visiblePoints.value.length - 1);
     return [x, y(Number(point.value))] as const;
   });
   return {
     line: coords.map(([x, pointY]) => `${x},${pointY}`).join(" "),
     zeroY: y(0),
+    ticks,
     points: coords.flatMap(([x, pointY]) => [x, pointY]),
   };
 });
@@ -250,6 +271,25 @@ function formatMoney(value: string) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+}
+
+function formatChartTick(value: number) {
+  const formatted = Number(value.toFixed(2)).toLocaleString("zh-CN", {
+    maximumFractionDigits: 2,
+  });
+  return `${value < 0 ? "−" : ""}¥${formatted.replace(/^-/, "")}`;
+}
+
+function changePeriod(value: string) {
+  period.value = value as Period;
+}
+
+function changeOrigin(value: string) {
+  origin.value = value as "all" | "personal" | "family";
+}
+
+function changeBasis(value: string) {
+  basis.value = value as Basis;
 }
 
 function movePeriod(step: number) {
@@ -643,18 +683,15 @@ onMounted(() => void load());
 
     <div class="reports-toolbar">
       <div class="reports-period-row">
-        <div class="report-tabs" role="tablist" aria-label="统计周期">
-          <button
-            v-for="option in periodOptions"
-            :key="option[0]"
-            :class="{ selected: period === option[0] }"
-            role="tab"
-            :aria-selected="period === option[0]"
-            @click="period = option[0]"
-          >
-            {{ option[1] }}
-          </button>
-        </div>
+        <SegmentedControl
+          :model-value="period"
+          :options="periodSegments"
+          ariaLabel="统计周期"
+          role="tablist"
+          size="regular"
+          class="report-segment"
+          @update:model-value="changePeriod"
+        />
         <button class="quiet-button report-period-nav" @click="movePeriod(-1)">
           ‹
         </button>
@@ -675,33 +712,24 @@ onMounted(() => void load());
         </button>
       </div>
       <div class="reports-toolbar-end">
-        <div
+        <SegmentedControl
           v-if="session.activeSpace === 'personal'"
-          class="report-tabs"
-          role="group"
-          aria-label="费用归属"
-        >
-          <button
-            v-for="option in originOptions"
-            :key="option[0]"
-            :class="{ selected: origin === option[0] }"
-            @click="origin = option[0]"
-          >
-            {{ option[1] }}
-          </button>
-        </div>
+          :model-value="origin"
+          :options="originSegments"
+          ariaLabel="费用归属"
+          size="regular"
+          class="report-segment"
+          @update:model-value="changeOrigin"
+        />
         <span v-else class="report-family-label">家庭归属费用</span>
-        <div class="report-tabs" role="group" aria-label="统计口径">
-          <button :class="{ selected: basis === 'net' }" @click="basis = 'net'">
-            净支出
-          </button>
-          <button
-            :class="{ selected: basis === 'expense' }"
-            @click="basis = 'expense'"
-          >
-            原始支出
-          </button>
-        </div>
+        <SegmentedControl
+          :model-value="basis"
+          :options="basisSegments"
+          ariaLabel="统计口径"
+          size="regular"
+          class="report-segment"
+          @update:model-value="changeBasis"
+        />
       </div>
     </div>
 
@@ -748,13 +776,32 @@ onMounted(() => void load());
           </div>
           <div v-else class="report-chart-wrap">
             <svg
+              :key="chartKey"
               class="report-chart"
               viewBox="0 0 720 220"
               role="img"
-              aria-label="所选期间的支出趋势"
+              aria-label="所选期间的支出趋势，纵轴金额单位为元"
             >
-              <line x1="42" x2="698" :y1="chart.zeroY" :y2="chart.zeroY" />
-              <polyline :points="chart.line" />
+              <g v-for="tick in chart.ticks" :key="tick.value">
+                <line x1="102" x2="698" :y1="tick.y" :y2="tick.y" />
+                <text
+                  class="report-chart-tick"
+                  x="94"
+                  :y="tick.y"
+                  text-anchor="end"
+                  dominant-baseline="middle"
+                >
+                  {{ formatChartTick(tick.value) }}
+                </text>
+              </g>
+              <line
+                class="report-chart-zero"
+                x1="102"
+                x2="698"
+                :y1="chart.zeroY"
+                :y2="chart.zeroY"
+              />
+              <polyline :points="chart.line" pathLength="1" />
               <circle
                 v-for="(point, index) in chartDots"
                 :key="index"

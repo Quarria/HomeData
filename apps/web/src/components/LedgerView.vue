@@ -3,6 +3,7 @@ import { computed, onMounted, reactive, ref, watch } from "vue";
 import { ApiClientError, apiRequest, newIdempotencyKey } from "../api/client";
 import { useSessionStore } from "../stores/session";
 import AppIcon from "./AppIcon.vue";
+import SegmentedControl from "./SegmentedControl.vue";
 
 type Category = { id: string; code: string; name: string };
 type Refund = {
@@ -62,6 +63,19 @@ type ReceiptDraft = {
 
 const props = defineProps<{ initialAction?: string; initialReceipt?: File }>();
 const session = useSessionStore();
+const spaceOptions = computed(() =>
+  session.family
+    ? [
+        { value: "personal", label: "个人" },
+        { value: "family", label: "家庭" },
+      ]
+    : [{ value: "personal", label: "个人" }],
+);
+const originOptions = [
+  { value: "all", label: "全部" },
+  { value: "personal", label: "个人费用" },
+  { value: "family", label: "家庭费用" },
+];
 const categories = ref<Category[]>([]);
 const expenses = ref<Expense[]>([]);
 const loading = ref(false);
@@ -94,6 +108,14 @@ const form = reactive({
   note: "",
   refundAmount: "",
 });
+
+function changeSpace(value: string) {
+  session.setSpace(value as "personal" | "family");
+}
+
+function changeOrigin(value: string) {
+  origin.value = value as "all" | "personal" | "family";
+}
 
 function today() {
   const now = new Date();
@@ -466,20 +488,14 @@ function displayDate(value: string) {
 <template>
   <section class="ledger-page" aria-label="账本">
     <div class="ledger-toolbar">
-      <div class="ledger-space-tabs" role="group" aria-label="账本空间">
-        <button
-          :class="{ selected: session.activeSpace === 'personal' }"
-          @click="session.setSpace('personal')"
-        >
-          个人
-        </button>
-        <button
-          v-if="session.family"
-          :class="{ selected: session.activeSpace === 'family' }"
-          @click="session.setSpace('family')"
-        >
-          家庭
-        </button>
+      <div class="ledger-space-tabs">
+        <SegmentedControl
+          :model-value="session.activeSpace"
+          :options="spaceOptions"
+          ariaLabel="账本空间"
+          size="compact"
+          @update:model-value="changeSpace"
+        />
         <span class="ledger-period"
           >{{ new Date().getFullYear() }}年{{
             new Date().getMonth() + 1
@@ -537,25 +553,15 @@ function displayDate(value: string) {
       </div>
     </section>
     <div class="ledger-filter-row">
-      <div
+      <SegmentedControl
         v-if="session.activeSpace === 'personal'"
+        :model-value="origin"
+        :options="originOptions"
+        ariaLabel="归属筛选"
+        size="compact"
         class="ledger-origin"
-        role="group"
-        aria-label="归属筛选"
-      >
-        <button
-          v-for="option in [
-            ['all', '全部'],
-            ['personal', '个人费用'],
-            ['family', '家庭费用'],
-          ] as const"
-          :key="option[0]"
-          :class="{ selected: origin === option[0] }"
-          @click="origin = option[0]"
-        >
-          {{ option[1] }}
-        </button>
-      </div>
+        @update:model-value="changeOrigin"
+      />
       <label class="ledger-search"
         ><span class="sr-only">搜索名称或备注</span
         ><input v-model="search" placeholder="搜索名称或备注"

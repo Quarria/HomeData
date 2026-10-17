@@ -963,7 +963,6 @@ a {
   background: var(--surface-deep);
   padding: 4px;
 }
-.ledger-space-tabs button,
 .ledger-origin button {
   min-height: 36px;
   border: 0;
@@ -973,7 +972,6 @@ a {
   cursor: pointer;
   font-size: 13px;
 }
-.ledger-space-tabs button.selected,
 .ledger-origin button.selected {
   background: var(--ink);
   color: var(--paper);
@@ -1729,28 +1727,6 @@ a {
   gap: 14px;
   margin-bottom: 17px;
 }
-.tasks-tabs {
-  display: flex;
-  gap: 4px;
-  padding: 4px;
-  border: 0;
-  border-radius: 0;
-  background: var(--surface-deep);
-}
-.tasks-tabs button {
-  min-height: 34px;
-  padding: 0 14px;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: var(--muted);
-  font-size: 13px;
-}
-.tasks-tabs button.selected {
-  background: var(--ink);
-  color: var(--paper);
-  box-shadow: none;
-}
 .tasks-toolbar-actions {
   display: flex;
   align-items: center;
@@ -1885,9 +1861,10 @@ a {
   border-top: 1px solid var(--paper);
 }
 .occurrence-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   min-height: 50px;
   border-bottom: 1px solid var(--paper);
 }
@@ -1906,17 +1883,20 @@ a {
   font-size: 13px;
 }
 .occurrence-status {
-  margin-left: auto;
+  align-self: center;
+  justify-self: end;
+  margin-left: 0;
 }
 .occurrence-status.paid {
   background: var(--sage);
   color: var(--ink);
 }
-.occurrence-actions {
+.fixed-card-actions {
   display: flex;
-  gap: 3px;
+  justify-content: flex-end;
+  gap: 8px;
 }
-.occurrence-actions .quiet-button {
+.fixed-card-actions .quiet-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1932,20 +1912,7 @@ a {
   font-size: 13px;
 }
 .fixed-card > footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
   padding-top: 9px;
-}
-.fixed-card > footer .quiet-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 88px;
-  min-height: 36px;
-  padding: 0 12px;
-  font-size: 13px;
-  white-space: nowrap;
 }
 .fixed-reminder-help {
   margin: -2px 0 0;
@@ -2259,25 +2226,6 @@ a {
   justify-content: space-between;
   width: 100%;
 }
-.report-tabs {
-  display: inline-flex;
-  gap: 0;
-  padding: 0;
-  background: var(--surface-deep);
-}
-.report-tabs button {
-  min-height: 40px;
-  padding: 0 17px;
-  border: 0;
-  background: transparent;
-  color: var(--muted);
-  font-size: 13px;
-  cursor: pointer;
-}
-.report-tabs button.selected {
-  background: var(--ink);
-  color: var(--paper);
-}
 .report-date-input {
   width: 170px;
   min-height: 40px;
@@ -2368,11 +2316,26 @@ a {
   stroke: var(--line);
   stroke-width: 1;
 }
+.report-chart .report-chart-zero {
+  stroke-width: 1.5;
+}
+.report-chart .report-chart-tick {
+  fill: var(--muted);
+  font-size: 12px;
+}
 .report-chart polyline {
   fill: none;
   stroke: var(--green);
   stroke-width: 3;
   vector-effect: non-scaling-stroke;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: trend-line-in 520ms var(--ease-out) 80ms forwards;
+}
+@keyframes trend-line-in {
+  to {
+    stroke-dashoffset: 0;
+  }
 }
 .report-chart circle {
   fill: var(--green);
@@ -2858,10 +2821,6 @@ a {
     flex-direction: column;
     gap: 10px;
   }
-  .report-tabs button {
-    min-height: 40px;
-    padding-inline: 12px;
-  }
   .report-date-input {
     width: 135px;
   }
@@ -2939,19 +2898,24 @@ a {
     padding: 14px 12px 10px;
   }
   .occurrence-row {
-    flex-wrap: wrap;
-    gap: 7px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
     padding: 9px 0;
   }
   .occurrence-row > div:first-child {
-    flex: 1 1 42%;
+    grid-column: 1;
+    grid-row: 1;
   }
-  .occurrence-status {
-    margin-left: 0;
+  .occurrence-row > .occurrence-status {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .occurrence-row > .occurrence-actions {
+    grid-column: 1 / -1;
+    grid-row: 2;
   }
   .occurrence-actions {
-    width: 100%;
-    justify-content: flex-end;
+    justify-self: end;
   }
   .tasks-page .form-grid {
     grid-template-columns: 1fr;

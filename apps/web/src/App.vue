@@ -250,15 +250,17 @@ function disableLeavingPage(element: Element) {
             session.account.nickname.slice(0, 1)
           }}</span>
         </div>
-        <NotificationsView
-          v-if="notificationsOpen"
-          @close="notificationsOpen = false"
-          @unread-change="unreadNotifications = $event"
-          @open-tasks="
-            notificationsOpen = false;
-            activePage = 'tasks';
-          "
-        />
+        <Transition name="popover">
+          <NotificationsView
+            v-if="notificationsOpen"
+            @close="notificationsOpen = false"
+            @unread-change="unreadNotifications = $event"
+            @open-tasks="
+              notificationsOpen = false;
+              activePage = 'tasks';
+            "
+          />
+        </Transition>
       </header>
       <main class="page-content">
         <div

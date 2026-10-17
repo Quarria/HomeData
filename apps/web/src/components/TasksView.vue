@@ -8,6 +8,7 @@ import {
   patchJson,
   postJson,
 } from "../api/client";
+import SegmentedControl from "./SegmentedControl.vue";
 import { useSessionStore } from "../stores/session";
 
 type Person = { id: string; nickname: string };
@@ -59,6 +60,10 @@ const session = useSessionStore();
 const section = ref<"tasks" | "fixed">(
   ["pay", "fixed"].includes(props.initialAction ?? "") ? "fixed" : "tasks",
 );
+const sectionOptions = [
+  { value: "tasks", label: "普通待办" },
+  { value: "fixed", label: "固定费用" },
+];
 const tasks = ref<Task[]>([]);
 const rules = ref<Rule[]>([]);
 const categories = ref<Category[]>([]);
@@ -91,6 +96,9 @@ const paymentForm = reactive({ amount: "", occurredOn: today() });
 function today() {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+}
+function changeSection(value: string) {
+  section.value = value as "tasks" | "fixed";
 }
 function dueRuleLabel(rule: Rule) {
   const date = new Date(`${rule.anchorOn}T00:00:00`);
@@ -345,24 +353,14 @@ async function payOccurrence() {
 <template>
   <section class="tasks-page">
     <div class="tasks-toolbar">
-      <div class="tasks-tabs" role="tablist" aria-label="待办类别">
-        <button
-          role="tab"
-          :aria-selected="section === 'tasks'"
-          :class="{ selected: section === 'tasks' }"
-          @click="section = 'tasks'"
-        >
-          普通待办
-        </button>
-        <button
-          role="tab"
-          :aria-selected="section === 'fixed'"
-          :class="{ selected: section === 'fixed' }"
-          @click="section = 'fixed'"
-        >
-          固定费用
-        </button>
-      </div>
+      <SegmentedControl
+        :model-value="section"
+        :options="sectionOptions"
+        ariaLabel="待办类别"
+        role="tablist"
+        size="compact"
+        @update:model-value="changeSection"
+      />
       <div class="tasks-toolbar-actions">
         <select
           v-if="section === 'tasks'"
@@ -498,7 +496,7 @@ async function payOccurrence() {
               >
               <div
                 v-if="occurrence.status === 'PENDING'"
-                class="occurrence-actions"
+                class="fixed-card-actions occurrence-actions"
               >
                 <button class="quiet-button" @click="openPayment(occurrence)">
                   确认付款</button
@@ -515,7 +513,7 @@ async function payOccurrence() {
           <div v-else class="no-occurrence">
             期次会在个人提醒设置的提前日期生成；实际到期日按上方周期规则计算。
           </div>
-          <footer v-if="rule.canManage">
+          <footer v-if="rule.canManage" class="fixed-card-actions">
             <button class="quiet-button" @click="openRule(rule)">
               编辑规则</button
             ><button class="quiet-button" @click="toggleRule(rule)">

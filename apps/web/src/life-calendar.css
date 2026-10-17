@@ -270,6 +270,32 @@ textarea:focus {
 .text-button:hover {
   background: #f2e6e6;
 }
+.primary-button:hover,
+.quiet-button:hover,
+.text-button:hover {
+  transform: translateY(-1px);
+}
+@media (hover: hover) {
+  .fixed-card {
+    transition:
+      transform 180ms var(--ease-out),
+      box-shadow 180ms ease;
+  }
+  .fixed-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 22px rgb(76 41 52 / 8%);
+  }
+  .ledger-row,
+  .report-rank-row {
+    transition:
+      transform 180ms var(--ease-out),
+      background-color 160ms ease;
+  }
+  .ledger-row:hover,
+  .report-rank-row:hover {
+    transform: translateX(2px);
+  }
+}
 .preview-tag,
 .status-pill,
 .role-badge,
@@ -278,28 +304,154 @@ textarea:focus {
   background: var(--accent-soft);
   color: var(--accent);
 }
-.ledger-space-tabs,
 .ledger-origin,
-.tasks-tabs,
-.report-tabs {
+.segmented-control {
   border-radius: 25px;
   padding: 4px;
   background: #eee5df;
 }
-.ledger-space-tabs button,
-.ledger-origin button,
-.tasks-tabs button,
-.report-tabs button {
+.ledger-space-tabs {
+  gap: 12px;
+  padding: 0;
+  background: transparent;
+}
+.ledger-origin button {
   min-height: 36px;
   border-radius: 22px;
   font-size: 13px;
 }
-.ledger-space-tabs button.selected,
-.ledger-origin button.selected,
-.tasks-tabs button.selected,
-.report-tabs button.selected {
+.ledger-origin button.selected {
   background: var(--accent);
   color: #fff;
+}
+.segmented-control {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  isolation: isolate;
+  gap: 2px;
+  max-width: 100%;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+.segmented-control::after {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    ellipse 74px 46px at var(--pointer-glow-x, -120px)
+      var(--pointer-glow-y, -120px),
+    rgb(255 241 226 / 58%),
+    rgb(255 255 255 / 20%) 43%,
+    transparent 78%
+  );
+  content: "";
+  opacity: 0;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  transition: opacity 180ms ease;
+}
+.segmented-control.pointer-glow-active::after {
+  opacity: 1;
+}
+.pointer-glow-surface {
+  position: relative;
+  isolation: isolate;
+}
+.pointer-glow-surface::after {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    ellipse 86px 58px at var(--pointer-glow-x, -140px)
+      var(--pointer-glow-y, -140px),
+    rgb(255 241 226 / 56%),
+    rgb(255 255 255 / 18%) 43%,
+    transparent 78%
+  );
+  content: "";
+  opacity: 0;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  transition: opacity 180ms ease;
+}
+.pointer-glow-surface.pointer-glow-active::after {
+  opacity: 1;
+}
+.segmented-control .segmented-indicator {
+  position: absolute;
+  z-index: 0;
+  top: 4px;
+  bottom: 4px;
+  border-radius: 22px;
+  background: var(--accent);
+  box-shadow: 0 2px 5px rgb(76 41 52 / 14%);
+  opacity: 0;
+  pointer-events: none;
+}
+.segmented-control.is-ready .segmented-indicator {
+  opacity: 1;
+  transition:
+    left 480ms cubic-bezier(0.18, 1.28, 0.28, 1),
+    width 320ms cubic-bezier(0.2, 0.85, 0.35, 1),
+    opacity 120ms ease;
+}
+.segmented-control.no-motion .segmented-indicator {
+  transition: none;
+}
+.segmented-control button {
+  position: relative;
+  z-index: 2;
+  flex: 0 0 auto;
+  min-height: 40px;
+  padding-inline: 16px;
+  border: 0;
+  border-radius: 22px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+  transition: color 150ms ease;
+}
+.segmented-control .segmented-ripple {
+  position: absolute;
+  z-index: 1;
+  width: 14px;
+  height: 14px;
+  border: 1px solid rgb(255 236 224 / 68%);
+  border-radius: 50%;
+  background: rgb(255 238 226 / 24%);
+  box-shadow:
+    0 0 0 1px rgb(255 255 255 / 12%),
+    0 0 13px rgb(255 226 218 / 48%);
+  pointer-events: none;
+  transform: translate(-50%, -50%) scale(0.25);
+  animation: segmented-energy-ripple 560ms cubic-bezier(0.12, 0.6, 0.2, 1)
+    forwards;
+}
+@keyframes segmented-energy-ripple {
+  42% {
+    opacity: 0.78;
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(5.5);
+  }
+}
+.segmented-control--compact button {
+  min-height: 36px;
+  padding-inline: 14px;
+}
+.segmented-control button.selected,
+.segmented-control button.selected:hover {
+  background: transparent;
+  color: #fff;
+}
+.segmented-control button:not(.selected):hover {
+  background: transparent;
+  color: var(--ink);
 }
 .ledger-paper,
 .profile-section,
@@ -467,6 +619,7 @@ textarea:focus {
 }
 .ledger-overlay {
   background: #36222a55;
+  backdrop-filter: blur(3px);
 }
 .ledger-dialog {
   background: #faf6f2;
@@ -548,6 +701,7 @@ textarea:focus {
 }
 .notification-popover {
   border-radius: 14px;
+  transform-origin: top right;
 }
 .life-intro {
   display: flex;
@@ -855,24 +1009,90 @@ textarea:focus {
   }
 }
 .modal-enter-active {
-  transition: opacity 280ms ease;
+  transition:
+    opacity 320ms ease,
+    backdrop-filter 360ms ease;
 }
 .modal-leave-active {
-  transition: opacity 180ms ease;
+  transition:
+    opacity 190ms ease,
+    backdrop-filter 190ms ease;
 }
 .modal-enter-active .ledger-dialog {
-  transition: transform 280ms var(--ease-out);
+  transition:
+    transform 420ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    filter 380ms ease,
+    opacity 300ms ease;
 }
 .modal-leave-active .ledger-dialog {
-  transition: transform 180ms ease;
+  transition:
+    transform 210ms ease,
+    filter 180ms ease,
+    opacity 180ms ease;
+}
+.modal-enter-active .ledger-dialog > * {
+  transition:
+    opacity 240ms ease,
+    transform 320ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .modal-enter-from,
 .modal-leave-to {
   opacity: 0;
+  backdrop-filter: blur(0);
 }
 .modal-enter-from .ledger-dialog,
 .modal-leave-to .ledger-dialog {
-  transform: translateY(10px) scale(0.985);
+  transform: translateY(8px) scale(0.985);
+  filter: blur(6px);
+  opacity: 0;
+}
+.modal-enter-from .ledger-dialog > * {
+  opacity: 0;
+  transform: translateY(7px);
+}
+.modal-enter-active .ledger-dialog > :nth-child(1) {
+  transition-delay: 40ms;
+}
+.modal-enter-active .ledger-dialog > :nth-child(2) {
+  transition-delay: 75ms;
+}
+.modal-enter-active .ledger-dialog > :nth-child(3) {
+  transition-delay: 110ms;
+}
+.modal-enter-active .ledger-dialog > :nth-child(4) {
+  transition-delay: 145ms;
+}
+.modal-enter-active .ledger-dialog > :nth-child(5) {
+  transition-delay: 180ms;
+}
+.popover-enter-active .notification-popover {
+  transition:
+    opacity 280ms ease,
+    transform 360ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    filter 320ms ease;
+}
+.popover-leave-active .notification-popover {
+  transition:
+    opacity 160ms ease,
+    transform 180ms ease,
+    filter 160ms ease;
+}
+.popover-enter-from .notification-popover,
+.popover-leave-to .notification-popover {
+  transform: translateY(-8px) scale(0.985);
+  filter: blur(6px);
+  opacity: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .modal-enter-active,
+  .modal-leave-active,
+  .modal-enter-active .ledger-dialog,
+  .modal-leave-active .ledger-dialog,
+  .modal-enter-active .ledger-dialog > *,
+  .popover-enter-active .notification-popover,
+  .popover-leave-active .notification-popover {
+    transition: none;
+  }
 }
 .task-move,
 .task-enter-active {
@@ -1260,10 +1480,7 @@ textarea:focus {
   .task-copy strong {
     font-size: 15px;
   }
-  .report-tabs {
-    flex-wrap: wrap;
-  }
-  .report-tabs button {
+  .segmented-control button {
     padding-inline: 12px;
   }
   .report-detail-list article {
@@ -1323,7 +1540,7 @@ textarea:focus {
   .tasks-toolbar-actions {
     flex-wrap: wrap;
   }
-  .tasks-tabs button {
+  .segmented-control--compact button {
     padding-inline: 11px;
   }
 }
@@ -1334,6 +1551,12 @@ textarea:focus {
     animation: none !important;
     transition: none !important;
     scroll-behavior: auto !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .segmented-control::after {
+    transition: none;
   }
 }
 
@@ -1408,10 +1631,10 @@ textarea:focus {
     gap: 6px;
     width: 100%;
   }
-  .reports-period-row .report-tabs {
+  .reports-period-row .segmented-control {
     flex-wrap: nowrap;
   }
-  .reports-period-row .report-tabs button {
+  .reports-period-row .segmented-control button {
     padding-inline: 10px;
   }
   .report-period-nav {
@@ -1452,7 +1675,7 @@ textarea:focus {
   .life-actions > .life-record {
     padding: 11px 8px;
   }
-  .reports-period-row .report-tabs button {
+  .reports-period-row .segmented-control button {
     padding-inline: 8px;
   }
   .report-metric {
