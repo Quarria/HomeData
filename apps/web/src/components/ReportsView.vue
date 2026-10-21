@@ -527,6 +527,8 @@ async function generateAnalysis() {
           ? "今天的收支分析次数已用完。"
           : code === "PROVIDER_UNAVAILABLE"
             ? "AI 服务暂时不可用，请稍后重试。"
+            : code.startsWith("AI_OUTPUT_")
+              ? "AI 已响应，但分析结果格式不符合要求，请稍后重试。"
             : "分析未能完成，请稍后重试。";
   } finally {
     analysisBusy.value = false;

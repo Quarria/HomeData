@@ -177,16 +177,26 @@ export class AiProvider {
     };
     const content = envelope.choices?.[0]?.message?.content;
     if (!content) {
-      throw Object.assign(new Error("AI_OUTPUT_INVALID"), {
-        code: "AI_OUTPUT_INVALID",
+      throw Object.assign(new Error("AI_OUTPUT_EMPTY"), {
+        code: "AI_OUTPUT_EMPTY",
         retryable: false,
       });
     }
+    let parsed: unknown;
     try {
-      return { data: schema.parse(parseJson(content)), usage: envelope.usage };
+      parsed = parseJson(content);
     } catch (error) {
-      throw Object.assign(new Error("AI_OUTPUT_INVALID"), {
-        code: "AI_OUTPUT_INVALID",
+      throw Object.assign(new Error("AI_OUTPUT_JSON_INVALID"), {
+        code: "AI_OUTPUT_JSON_INVALID",
+        retryable: false,
+        cause: error,
+      });
+    }
+    try {
+      return { data: schema.parse(parsed), usage: envelope.usage };
+    } catch (error) {
+      throw Object.assign(new Error("AI_OUTPUT_SCHEMA_INVALID"), {
+        code: "AI_OUTPUT_SCHEMA_INVALID",
         retryable: false,
         cause: error,
       });
@@ -229,7 +239,7 @@ export class AiProvider {
     const config = validateEnvironment();
     return this.complete(
       config.AI_ANALYSIS_MODEL,
-      "你是家庭支出分析助手。只依据输入中的已汇总数据，给出变化 changes、证据 evidence、待核对事项 thingsToVerify。输出 JSON 对象。变化中的证据只能引用输入里的 evidence id；不重算或编造金额，不猜测消费动机。数据不足时明确说明。输入不包含个人姓名、商户、账目名称或逐笔内容，不请求补充这些隐私信息。",
+      "你是家庭支出分析助手。只依据输入中的已汇总数据进行分析，不重算或编造金额，不猜测消费动机。只返回一个 JSON 对象，必须包含 changes（元素字段 title、description、evidenceIds）、evidence（元素字段 id、label）、thingsToVerify；三个字段分别是数组，文本字段必须是字符串，evidenceIds 必须是字符串数组。没有明显变化时 changes 返回空数组；数据不足时在 thingsToVerify 中说明。evidence 中的 id 和 label 必须逐字取自输入 evidence；changes.evidenceIds 只能填写输入 evidence 的 id，不要创造或改写 ID。不得新增字段，不要返回 Markdown 代码块或 JSON 以外的文字。输入不包含个人姓名、商户、账目名称或逐笔内容，不请求补充这些隐私信息。",
       JSON.stringify(input),
       analysisSchema,
     );
@@ -290,8 +300,8 @@ export function validateAnalysisOutput(
       refs.some((id) => !evidenceIds.has(id) || !allowedEvidenceIds.has(id)),
     )
   ) {
-    throw Object.assign(new Error("AI_OUTPUT_INVALID"), {
-      code: "AI_OUTPUT_INVALID",
+    throw Object.assign(new Error("AI_OUTPUT_EVIDENCE_INVALID"), {
+      code: "AI_OUTPUT_EVIDENCE_INVALID",
       retryable: false,
     });
   }
