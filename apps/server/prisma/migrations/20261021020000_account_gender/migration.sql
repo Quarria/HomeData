@@ -1,0 +1,4 @@
+CREATE TYPE "AccountGender" AS ENUM ('MALE', 'FEMALE', 'UNSPECIFIED');
+
+ALTER TABLE "accounts"
+ADD COLUMN "gender" "AccountGender" NOT NULL DEFAULT 'UNSPECIFIED';

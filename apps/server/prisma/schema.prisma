@@ -17,6 +17,12 @@ enum AccountStatus {
   DISABLED
 }
 
+enum AccountGender {
+  MALE
+  FEMALE
+  UNSPECIFIED
+}
+
 enum FamilyStatus {
   ACTIVE
   ARCHIVED
@@ -133,6 +139,7 @@ model Account {
   username             String              @unique @db.VarChar(40)
   usernameNormalized   String              @unique @map("username_normalized") @db.VarChar(40)
   nickname             String              @db.VarChar(80)
+  gender               AccountGender       @default(UNSPECIFIED)
   passwordHash         String              @map("password_hash") @db.VarChar(255)
   systemRole           SystemRole          @default(USER) @map("system_role")
   status               AccountStatus       @default(ACTIVE)

@@ -155,7 +155,11 @@ export class AuthController {
     const updated = await this.prisma.$transaction(async (tx) => {
       const result = await tx.account.updateMany({
         where: { id: account.id, version: input.version, status: "ACTIVE" },
-        data: { nickname: input.nickname, version: { increment: 1 } },
+        data: {
+          nickname: input.nickname,
+          ...(input.gender ? { gender: input.gender } : {}),
+          version: { increment: 1 },
+        },
       });
       if (result.count !== 1) {
         throw new ConflictException({ code: "VERSION_CONFLICT" });
@@ -169,7 +173,9 @@ export class AuthController {
           action: "ACCOUNT_PROFILE_UPDATED",
           subjectType: "ACCOUNT",
           subjectId: account.id,
-          details: { fields: ["nickname"] },
+          details: {
+            fields: input.gender ? ["nickname", "gender"] : ["nickname"],
+          },
         },
       });
       return current;

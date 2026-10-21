@@ -48,6 +48,7 @@ export type PasswordChangeRequest = z.infer<typeof passwordChangeRequestSchema>;
 
 export const accountProfilePatchRequestSchema = z.object({
   nickname: z.string().trim().min(1).max(80),
+  gender: z.enum(["MALE", "FEMALE", "UNSPECIFIED"]).optional(),
   version: z.number().int().positive(),
 });
 
@@ -373,6 +374,7 @@ export type AccountSummary = {
   id: string;
   username: string;
   nickname: string;
+  gender: "MALE" | "FEMALE" | "UNSPECIFIED";
   systemRole: "USER" | "SYSTEM_ADMIN";
   status: "ACTIVE" | "DISABLED";
   mustChangePassword: boolean;

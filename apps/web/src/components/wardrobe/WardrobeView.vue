@@ -1502,12 +1502,6 @@ onBeforeUnmount(() => {
             maxlength="160"
             placeholder="例如：想叠穿、偏好浅色、避免黑色"
           ></textarea>
-          <small
-            >点击生成时，会把想法、场景、天气和候选衣物属性发送给系统配置的 AI
-            服务，从现有衣物组合中筛选并说明理由；AI
-            不能添加库存外衣物。每日最多 5
-            次，未配置、超额或失败时自动显示规则搭配。</small
-          >
         </label>
         <button
           class="wardrobe-primary"
@@ -1516,6 +1510,11 @@ onBeforeUnmount(() => {
         >
           {{ recommendationLoading ? "正在搭配…" : "生成今日搭配" }}
         </button>
+        <small class="wardrobe-outfit-ai-note"
+          >点击生成时，会把想法、场景、天气和候选衣物属性发送给系统配置的 AI
+          服务，从现有衣物组合中筛选并说明理由；AI 不能添加库存外衣物。每日最多
+          5 次，未配置、超额或失败时自动显示规则搭配。</small
+        >
       </div>
       <p class="wardrobe-outfit-note">
         按衣物的季节、场景和叠穿层次生成规则搭配；天气缺失时可手选条件。推荐不会自动购买或修改衣物。
@@ -2369,10 +2368,13 @@ onBeforeUnmount(() => {
   border-bottom-color: var(--accent);
 }
 .wardrobe-outfit-controls {
-  display: flex;
-  align-items: end;
+  display: grid;
+  grid-template-columns: minmax(150px, 0.8fr) minmax(180px, 1fr) minmax(
+      280px,
+      2.4fr
+    ) auto;
+  align-items: start;
   gap: 12px;
-  flex-wrap: wrap;
 }
 .wardrobe-outfit-controls label {
   display: grid;
@@ -2386,7 +2388,7 @@ onBeforeUnmount(() => {
   font-size: 12px;
 }
 .wardrobe-outfit-controls .wardrobe-idea-field {
-  flex: 1 1 280px;
+  min-width: 0;
 }
 .wardrobe-idea-field textarea {
   width: 100%;
@@ -2400,10 +2402,14 @@ onBeforeUnmount(() => {
   line-height: 1.5;
   resize: vertical;
 }
-.wardrobe-idea-field small {
+.wardrobe-outfit-ai-note {
+  grid-column: 1 / -1;
   color: var(--muted);
   font-size: 11px;
   line-height: 1.5;
+}
+.wardrobe-outfit-controls > button {
+  align-self: end;
 }
 .wardrobe-outfit-controls select {
   min-width: 190px;
@@ -3177,6 +3183,13 @@ onBeforeUnmount(() => {
   .wardrobe-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+  .wardrobe-outfit-controls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .wardrobe-outfit-controls .wardrobe-idea-field,
+  .wardrobe-outfit-ai-note {
+    grid-column: 1 / -1;
+  }
   .wardrobe-form-grid {
     grid-template-columns: 220px minmax(0, 1fr);
     gap: 18px;
@@ -3203,6 +3216,9 @@ onBeforeUnmount(() => {
   .wardrobe-outfit-controls select,
   .wardrobe-outfit-controls > button {
     width: 100%;
+  }
+  .wardrobe-outfit-controls {
+    grid-template-columns: 1fr;
   }
   .wardrobe-trip-controls .wardrobe-idea-field,
   .wardrobe-trip-controls > button.wardrobe-primary {

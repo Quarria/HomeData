@@ -1449,13 +1449,31 @@ a {
   font-size: 13px;
 }
 .nickname-form {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(160px, 1fr) auto;
+  align-items: end;
   gap: 7px;
   margin-left: auto;
 }
 .nickname-form input {
-  width: 150px;
+  width: 100%;
   min-height: 44px;
+}
+.gender-field {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.gender-field select {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 0;
+  background: var(--paper);
+  color: var(--ink);
+  padding: 0 12px;
+  font-size: 14px;
 }
 .quiet-button,
 .primary-button,
@@ -1702,6 +1720,7 @@ a {
   .nickname-form {
     grid-column: 1 / -1;
     order: 0;
+    grid-template-columns: minmax(0, 1fr);
     width: auto;
     margin: 4px 0 0;
   }

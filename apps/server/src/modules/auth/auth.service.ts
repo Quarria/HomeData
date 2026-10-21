@@ -24,6 +24,7 @@ export function accountSummary(account: {
   id: string;
   username: string;
   nickname: string;
+  gender: "MALE" | "FEMALE" | "UNSPECIFIED";
   systemRole: "USER" | "SYSTEM_ADMIN";
   status: "ACTIVE" | "DISABLED";
   mustChangePassword: boolean;
@@ -33,6 +34,7 @@ export function accountSummary(account: {
     id: account.id,
     username: account.username,
     nickname: account.nickname,
+    gender: account.gender,
     systemRole: account.systemRole,
     status: account.status,
     mustChangePassword: account.mustChangePassword,

@@ -25,6 +25,7 @@ const accountLoadingMore = ref(false);
 const accountForm = ref({ username: "", nickname: "", initialPassword: "" });
 const accountPasswords = ref<Record<string, string>>({});
 const nickname = ref("");
+const gender = ref<AccountSummary["gender"]>("UNSPECIFIED");
 const reminderPreference = ref({
   localTime: "09:00",
   taskAdvanceDays: 1,
@@ -37,6 +38,13 @@ watch(
   () => session.account?.nickname,
   (value) => {
     if (value) nickname.value = value;
+  },
+  { immediate: true },
+);
+watch(
+  () => session.account?.gender,
+  (value) => {
+    if (value) gender.value = value;
   },
   { immediate: true },
 );
@@ -82,17 +90,18 @@ async function addMember() {
   }
 }
 
-async function saveNickname() {
+async function saveProfile() {
   if (!session.account) return;
   loading.value = true;
   error.value = "";
   try {
     await patchJson("/me", {
       nickname: nickname.value,
+      gender: gender.value,
       version: session.account.version,
     });
     await session.refresh();
-    message.value = "昵称已更新。";
+    message.value = "个人资料已更新。";
   } catch (reason) {
     showError(reason);
   } finally {
@@ -304,18 +313,29 @@ onMounted(() => void loadReminderPreference());
               <strong>{{ session.account?.nickname }}</strong>
               <p>用户名：{{ session.account?.username }}</p>
             </div>
-            <form class="nickname-form" @submit.prevent="saveNickname">
+            <form class="nickname-form" @submit.prevent="saveProfile">
               <label class="sr-only" for="nickname">昵称</label
               ><input
                 id="nickname"
                 v-model="nickname"
                 required
                 maxlength="80"
-              /><button
+              /><label class="gender-field" for="account-gender">
+                <span>性别（用于衣物 AI 建议）</span>
+                <select id="account-gender" v-model="gender">
+                  <option value="UNSPECIFIED">不指定</option>
+                  <option value="MALE">男</option>
+                  <option value="FEMALE">女</option>
+                </select> </label
+              ><button
                 class="quiet-button"
-                :disabled="loading || nickname === session.account?.nickname"
+                :disabled="
+                  loading ||
+                  (nickname === session.account?.nickname &&
+                    gender === session.account?.gender)
+                "
               >
-                保存昵称
+                保存资料
               </button>
             </form>
             <button

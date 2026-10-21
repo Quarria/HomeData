@@ -238,6 +238,11 @@ export class AiService {
     key: string,
   ) {
     this.assertConfigured();
+    const account = await this.prisma.account.findUnique({
+      where: { id: actorId },
+      select: { gender: true },
+    });
+    const gender = account?.gender ?? "UNSPECIFIED";
     const image = await this.prisma.wardrobeImage.findFirst({
       where: { id: wardrobeImageId, uploadedById: actorId, garment: null },
       select: { id: true, contentHash: true },
@@ -249,6 +254,7 @@ export class AiService {
         actorId,
         type: "WARDROBE_RECOGNITION",
         status: "SUCCEEDED",
+        input: { equals: { wardrobeImageId, gender } },
         wardrobeImage: { contentHash: image.contentHash },
       },
       orderBy: { finishedAt: "desc" },
@@ -258,7 +264,7 @@ export class AiService {
       actorId,
       "WARDROBE_RECOGNITION",
       key,
-      { wardrobeImageId },
+      { wardrobeImageId, gender },
       { wardrobeImageId },
     );
     return this.runDto(run);
@@ -699,9 +705,14 @@ export class AiService {
         const imageId = (claimed.input as { wardrobeImageId: string })
           .wardrobeImageId;
         const image = await this.loadWardrobeImage(claimed.actorId, imageId);
+        const account = await this.prisma.account.findUnique({
+          where: { id: claimed.actorId },
+          select: { gender: true },
+        });
         const recognition = await this.provider.recognizeWardrobe({
           image: await this.wardrobeImageStorage.read(image.storageKey),
           mime: image.mimeType,
+          gender: account?.gender ?? "UNSPECIFIED",
         });
         usage = recognition.usage;
         result = recognition.data;

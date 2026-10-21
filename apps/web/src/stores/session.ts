@@ -6,6 +6,7 @@ export interface AccountSummary {
   id: string;
   username: string;
   nickname: string;
+  gender: "MALE" | "FEMALE" | "UNSPECIFIED";
   systemRole: "USER" | "SYSTEM_ADMIN";
   status: "ACTIVE" | "DISABLED";
   mustChangePassword: boolean;
