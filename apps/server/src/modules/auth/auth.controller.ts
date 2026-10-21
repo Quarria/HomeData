@@ -117,6 +117,15 @@ export class AuthController {
           adminAccountId: membership.family.adminAccountId,
           status: membership.family.status,
           version: membership.family.version,
+          defaultCity: membership.family.defaultCityName
+            ? {
+                name: membership.family.defaultCityName,
+                countryCode: membership.family.defaultCityCountry!,
+                latitude: membership.family.defaultCityLatitude!,
+                longitude: membership.family.defaultCityLongitude!,
+                timezone: membership.family.defaultCityTimezone!,
+              }
+            : null,
           role:
             membership.family.adminAccountId === account.id
               ? "ADMIN"

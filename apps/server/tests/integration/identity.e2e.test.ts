@@ -279,6 +279,37 @@ describe("account, family, and ledger flows", () => {
       },
     );
     expect(removedSecond.status).toBe(200);
+    const familyAfterRemove = (await removedSecond.json()).data as {
+      version: number;
+    };
+
+    const defaultCity = {
+      name: "杭州市 · 浙江 · 中国",
+      countryCode: "CN",
+      latitude: 30.27,
+      longitude: 120.15,
+      timezone: "Asia/Shanghai",
+    };
+    const savedCity = await api(`/families/${family.id}/default-city`, {
+      method: "PATCH",
+      headers: {
+        origin: "http://localhost:5173",
+        cookie: `${newSession}; ${csrfCookie}`,
+        "x-csrf-token": csrfToken,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        version: familyAfterRemove.version,
+        city: defaultCity,
+      }),
+    });
+    expect(savedCity.status).toBe(200);
+    const profileAfterCitySave = await api("/me", {
+      headers: { cookie: newSession },
+    });
+    expect((await profileAfterCitySave.json()).data.family.defaultCity).toEqual(
+      defaultCity,
+    );
 
     const secondFamily = await post("/families", { name: "不能重复加入" }, [
       newSession,
@@ -289,7 +320,7 @@ describe("account, family, and ledger flows", () => {
       `/families/${family.id}/handover`,
       {
         targetAccountId: memberAccountId,
-        version: familyWithThree.version + 1,
+        version: familyAfterRemove.version + 1,
       },
       [newSession],
     );
