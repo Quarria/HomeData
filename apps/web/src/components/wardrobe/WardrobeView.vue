@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { snapshotRecognitionFields } from "./recognition-snapshot";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import {
   ApiClientError,
@@ -534,7 +535,7 @@ async function chooseImage(event: Event) {
 async function recognizeImage() {
   const image = uploadedImage.value;
   if (!image || !aiEnabled.value || recognizing.value) return;
-  const before = structuredClone(form.value);
+  const before = snapshotRecognitionFields(form.value);
   recognizing.value = true;
   recognitionMessage.value = "正在识别照片，完成后会填入可核对的草稿…";
   try {
