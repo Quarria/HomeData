@@ -168,6 +168,7 @@ const cityResults = ref<City[]>([]);
 const citySearching = ref(false);
 const citySaving = ref(false);
 const citySaveMessage = ref("");
+const citySettingsOpen = ref(false);
 const weatherLoading = ref(false);
 const weatherError = ref("");
 const activeTab = ref<"closet" | "daily" | "trip" | "saved">("closet");
@@ -195,6 +196,7 @@ const todayWeather = ref<{
   temperatureMax: number | null;
   temperatureMin: number | null;
   precipitationMm: number | null;
+  weatherCode: number | null;
 } | null>(null);
 const selectedExpense = ref<ExpenseDetails | null>(null);
 const initialExpenseId = ref("");
@@ -256,6 +258,9 @@ const statuses: Array<{ value: Garment["status"]; label: string }> = [
 const canEditSelected = computed(
   () => selected.value?.ownerId === session.account?.id,
 );
+const weatherPresentation = computed(() =>
+  presentWeather(todayWeather.value?.weatherCode ?? null),
+);
 const visibleRows = computed(() => rows.value);
 const editableRows = computed(() =>
   rows.value.filter(
@@ -295,7 +300,10 @@ function resetForm() {
     expenseTitle: "",
     expenseDate: new Date().toISOString().slice(0, 10),
     expenseAmount: "",
-    expenseCategoryId: expenseCategories.value[0]?.id ?? "",
+    expenseCategoryId:
+      expenseCategories.value.find(({ code }) => code === "CLOTHING")?.id ??
+      expenseCategories.value[0]?.id ??
+      "",
     expenseFamilyVisible: false,
     expenseQuantity: "",
     expenseUnit: "",
@@ -361,12 +369,18 @@ async function loadExpenseOptions() {
       limit: "100",
       deleted: "false",
     });
+    const clothingCategory = expenseCategories.value.find(
+      ({ code }) => code === "CLOTHING",
+    );
+    if (clothingCategory) params.set("categoryId", clothingCategory.id);
     if (expenseSearch.value.trim()) params.set("q", expenseSearch.value.trim());
     const result = await apiRequest<{ items: ExpenseDetails[] }>(
       `/expenses?${params}`,
     );
     const items = result.items.filter(
-      (expense) => expense.capabilities?.canEdit !== false,
+      (expense) =>
+        expense.category.code === "CLOTHING" &&
+        expense.capabilities?.canEdit !== false,
     );
     if (
       selectedExpense.value &&
@@ -385,6 +399,22 @@ async function loadExpenseOptions() {
 function selectExpense(expenseId: string) {
   selectedExpense.value =
     expenseOptions.value.find((expense) => expense.id === expenseId) ?? null;
+}
+function presentWeather(code: number | null) {
+  if (code === 0) return { icon: "☀️", label: "晴朗" };
+  if (code === 1) return { icon: "🌤️", label: "大致晴朗" };
+  if (code === 2) return { icon: "⛅", label: "多云间晴" };
+  if ([3, 45, 48].includes(code ?? -1))
+    return {
+      icon: code === 3 ? "☁️" : "🌫️",
+      label: code === 3 ? "阴天" : "有雾",
+    };
+  if ([51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82].includes(code ?? -1))
+    return { icon: "🌧️", label: "有雨" };
+  if ([71, 73, 75, 77, 85, 86].includes(code ?? -1))
+    return { icon: "❄️", label: "有雪" };
+  if ([95, 96, 99].includes(code ?? -1)) return { icon: "⛈️", label: "雷雨" };
+  return { icon: "🌡️", label: "天气信息" };
 }
 async function discardTemporaryImage() {
   const imageId = uploadedImage.value?.id;
@@ -811,6 +841,7 @@ async function saveDefaultCity(city: City) {
     session.family = updatedFamily;
     cityResults.value = [];
     cityQuery.value = "";
+    citySettingsOpen.value = false;
     citySaveMessage.value = `家庭默认城市已设置为${updatedFamily.defaultCity?.name ?? city.name}`;
   } catch (reason) {
     weatherError.value = message(reason, "保存默认城市失败，请重试。");
@@ -842,6 +873,7 @@ async function loadTodayWeather() {
         temperatureMax: number | null;
         temperatureMin: number | null;
         precipitationMm: number | null;
+        weatherCode: number | null;
       }>;
     }>("/wardrobe/weather/forecast", {
       method: "POST",
@@ -1227,15 +1259,18 @@ watch(
 );
 onMounted(async () => {
   wardrobeMounted = true;
-  void loadExpenseOptions();
   try {
     expenseCategories.value =
       await apiRequest<ExpenseCategory[]>("/categories");
     if (!form.value.expenseCategoryId)
-      form.value.expenseCategoryId = expenseCategories.value[0]?.id ?? "";
+      form.value.expenseCategoryId =
+        expenseCategories.value.find(({ code }) => code === "CLOTHING")?.id ??
+        expenseCategories.value[0]?.id ??
+        "";
   } catch {
     // Manual wardrobe entry remains available if ledger categories are unavailable.
   }
+  void loadExpenseOptions();
   void apiRequest<{ enabled: boolean }>("/ai/status")
     .then((status) => (aiEnabled.value = status.enabled))
     .catch(() => (aiEnabled.value = false));
@@ -1290,6 +1325,106 @@ onBeforeUnmount(() => {
 
 <template>
   <section class="wardrobe-page">
+    <section
+      v-if="session.family?.status === 'ACTIVE'"
+      class="wardrobe-weather-panel"
+      aria-label="天气"
+    >
+      <div class="wardrobe-weather-primary">
+        <div class="wardrobe-weather-city">
+          <strong>{{
+            session.family.defaultCity?.name || "尚未设置城市"
+          }}</strong>
+        </div>
+        <p v-if="weatherLoading" class="wardrobe-weather-state" role="status">
+          正在读取天气…
+        </p>
+        <div v-else-if="todayWeather?.available" class="wardrobe-weather-state">
+          <span
+            class="wardrobe-weather-icon"
+            role="img"
+            :aria-label="weatherPresentation.label"
+            >{{ weatherPresentation.icon }}</span
+          >
+          <span class="wardrobe-weather-condition">
+            {{ weatherPresentation.label }}
+          </span>
+          <span class="wardrobe-weather-metric">
+            🌡️ {{ todayWeather.temperatureMin ?? "—" }}°–{{
+              todayWeather.temperatureMax ?? "—"
+            }}°
+          </span>
+          <span class="wardrobe-weather-metric">
+            🌧️ 降水 {{ todayWeather.precipitationMm ?? "—" }} mm
+          </span>
+        </div>
+        <p v-else class="wardrobe-weather-state wardrobe-weather-muted">
+          {{
+            session.family.defaultCity
+              ? "今日天气暂不可用"
+              : "设置城市后显示天气与穿搭参考"
+          }}
+        </p>
+        <div class="wardrobe-weather-actions">
+          <button
+            v-if="session.family.defaultCity"
+            type="button"
+            class="wardrobe-weather-refresh"
+            :disabled="weatherLoading"
+            @click="loadTodayWeather"
+          >
+            <span aria-hidden="true">↻</span>刷新
+          </button>
+          <details
+            class="wardrobe-weather-settings"
+            :open="citySettingsOpen || !session.family.defaultCity"
+            @toggle="
+              citySettingsOpen = ($event.target as HTMLDetailsElement).open
+            "
+          >
+            <summary>
+              {{ session.family.defaultCity ? "城市设置" : "设置城市" }}
+            </summary>
+            <div class="wardrobe-city-picker">
+              <label
+                >搜索并设置家庭默认城市<input
+                  v-model="cityQuery"
+                  maxlength="100"
+                  placeholder="输入城市名，例如杭州"
+              /></label>
+              <span v-if="citySearching" class="wardrobe-weather-muted"
+                >正在搜索…</span
+              >
+              <span
+                v-if="citySaving"
+                class="wardrobe-weather-muted"
+                role="status"
+                >正在保存家庭默认城市…</span
+              >
+              <button
+                v-for="city in cityResults"
+                :key="`${city.latitude}-${city.longitude}-${city.timezone}`"
+                type="button"
+                class="wardrobe-city-result"
+                :disabled="citySaving"
+                @click="saveDefaultCity(city)"
+              >
+                {{ city.name }} <small>{{ city.timezone }}</small>
+              </button>
+            </div>
+          </details>
+        </div>
+      </div>
+      <p v-if="weatherError" class="wardrobe-weather-error" role="alert">
+        {{ weatherError }}
+      </p>
+      <p v-if="citySaveMessage" class="wardrobe-weather-success" role="status">
+        {{ citySaveMessage }}
+      </p>
+      <small class="wardrobe-weather-attribution">
+        天气数据：Open-Meteo · CC BY 4.0
+      </small>
+    </section>
     <header class="wardrobe-heading">
       <div>
         <p class="wardrobe-eyebrow">CLOSET · 衣物档案</p>
@@ -1329,73 +1464,6 @@ onBeforeUnmount(() => {
         收藏搭配
       </button>
     </nav>
-    <section
-      v-if="session.family?.status === 'ACTIVE'"
-      class="wardrobe-weather-panel"
-    >
-      <div class="wardrobe-weather-copy">
-        <p class="wardrobe-eyebrow">LOCAL WEATHER</p>
-        <strong>{{
-          session.family.defaultCity?.name || "设置家庭默认城市"
-        }}</strong>
-        <p v-if="weatherLoading">正在读取当地天气…</p>
-        <p v-else-if="todayWeather?.available">
-          {{ todayWeather.date }} · {{ todayWeather.temperatureMin ?? "—" }}° 至
-          {{ todayWeather.temperatureMax ?? "—" }}° · 降水
-          {{ todayWeather.precipitationMm ?? "—" }} mm
-        </p>
-        <p v-else-if="session.family.defaultCity">
-          今日预报暂不可用，穿搭推荐会明确标注天气缺失。
-        </p>
-        <small>用于日常穿搭参考，不会自动定位。</small>
-      </div>
-      <div class="wardrobe-city-picker">
-        <label
-          >搜索并设置家庭默认城市<input
-            v-model="cityQuery"
-            maxlength="100"
-            placeholder="输入城市名，例如杭州"
-        /></label>
-        <span v-if="citySearching" class="wardrobe-weather-muted"
-          >正在搜索…</span
-        >
-        <span v-if="citySaving" class="wardrobe-weather-muted" role="status"
-          >正在保存家庭默认城市…</span
-        >
-        <button
-          v-for="city in cityResults"
-          :key="`${city.latitude}-${city.longitude}-${city.timezone}`"
-          type="button"
-          class="wardrobe-city-result"
-          :disabled="citySaving"
-          @click="saveDefaultCity(city)"
-        >
-          {{ city.name }} <small>{{ city.timezone }}</small>
-        </button>
-        <p v-if="weatherError" class="wardrobe-weather-error" role="alert">
-          {{ weatherError }}
-        </p>
-        <p
-          v-if="citySaveMessage"
-          class="wardrobe-weather-success"
-          role="status"
-        >
-          {{ citySaveMessage }}
-        </p>
-      </div>
-      <button
-        v-if="session.family.defaultCity"
-        type="button"
-        class="wardrobe-quiet"
-        :disabled="weatherLoading"
-        @click="loadTodayWeather"
-      >
-        刷新天气
-      </button>
-      <small class="wardrobe-weather-attribution"
-        >天气数据：Open-Meteo · CC BY 4.0</small
-      >
-    </section>
     <p v-if="error" class="inline-error" role="alert">{{ error }}</p>
     <p v-if="success" class="wardrobe-expense-note" role="status">
       {{ success }}
@@ -2536,35 +2604,90 @@ onBeforeUnmount(() => {
   grid-column: 1 / -1;
 }
 .wardrobe-weather-panel {
-  position: relative;
-  display: grid;
-  grid-template-columns: minmax(190px, 1fr) minmax(240px, 1.2fr) auto;
-  gap: 18px 24px;
-  align-items: center;
-  margin: 18px 0 24px;
-  padding: 18px 20px 28px;
+  margin: 0 0 24px;
+  padding: 13px 16px;
   border: 1px solid var(--line);
   background: #faf6f2;
 }
-.wardrobe-weather-copy strong {
-  display: block;
-  margin-top: 5px;
+.wardrobe-weather-primary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 22px;
+}
+.wardrobe-weather-city {
+  display: grid;
+  gap: 3px;
+  min-width: 150px;
+}
+.wardrobe-weather-city strong {
   color: var(--ink);
   font-family: var(--serif);
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 500;
 }
-.wardrobe-weather-copy p,
-.wardrobe-weather-copy small,
+.wardrobe-weather-state {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px 13px;
+  margin: 0;
+  color: var(--ink);
+  font-size: 13px;
+}
+.wardrobe-weather-icon {
+  font-size: 24px;
+  line-height: 1;
+}
+.wardrobe-weather-condition {
+  font-weight: 600;
+}
+.wardrobe-weather-metric {
+  color: var(--muted);
+  white-space: nowrap;
+}
 .wardrobe-weather-muted {
   color: var(--muted);
   font-size: 12px;
   line-height: 1.6;
 }
+.wardrobe-weather-actions {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  margin-left: auto;
+}
+.wardrobe-weather-refresh {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.wardrobe-weather-refresh span {
+  margin-right: 4px;
+  font-size: 16px;
+}
+.wardrobe-weather-refresh:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+.wardrobe-weather-settings summary {
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.wardrobe-weather-settings[open] {
+  flex-basis: 100%;
+}
 .wardrobe-city-picker {
   display: grid;
   grid-template-columns: 1fr;
   gap: 6px;
+  max-width: 520px;
+  padding-top: 10px;
 }
 .wardrobe-city-picker label {
   display: grid;
@@ -2605,9 +2728,8 @@ onBeforeUnmount(() => {
   font-size: 12px;
 }
 .wardrobe-weather-attribution {
-  position: absolute;
-  bottom: 8px;
-  right: 12px;
+  display: block;
+  margin-top: 7px;
 }
 .wardrobe-heading {
   display: flex;
@@ -3017,12 +3139,6 @@ onBeforeUnmount(() => {
   margin-bottom: 16px;
 }
 @media (max-width: 900px) {
-  .wardrobe-weather-panel {
-    grid-template-columns: 1fr auto;
-  }
-  .wardrobe-city-picker {
-    grid-column: 1 / -1;
-  }
   .wardrobe-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -3073,11 +3189,24 @@ onBeforeUnmount(() => {
     grid-template-columns: 1fr;
   }
   .wardrobe-weather-panel {
-    grid-template-columns: 1fr;
-    padding: 16px 14px 30px;
+    padding: 12px;
   }
-  .wardrobe-city-picker {
-    grid-column: auto;
+  .wardrobe-weather-primary {
+    align-items: flex-start;
+    gap: 10px 14px;
+  }
+  .wardrobe-weather-city {
+    min-width: 0;
+    flex: 1 1 100%;
+  }
+  .wardrobe-weather-actions {
+    margin-left: 0;
+  }
+  .wardrobe-weather-settings[open] {
+    flex-basis: 100%;
+  }
+  .wardrobe-weather-state {
+    flex: 1 1 100%;
   }
   .wardrobe-page {
     padding-top: 0;
