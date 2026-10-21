@@ -11,7 +11,7 @@ import AppIcon from "./AppIcon.vue";
 const emit = defineEmits<{
   navigate: [
     target: {
-      page: "ledger" | "tasks" | "reports";
+      page: "ledger" | "tasks" | "reports" | "wardrobe";
       action?: string;
       id?: string;
       file?: File;
@@ -353,6 +353,13 @@ function chooseReceipt(event: Event) {
             ><AppIcon name="arrow" :size="18" />
           </button>
         </div>
+        <button
+          class="life-wardrobe-link"
+          @click="emit('navigate', { page: 'wardrobe' })"
+        >
+          <AppIcon name="wardrobe" :size="17" />打开智能衣柜
+          <AppIcon name="arrow" :size="16" />
+        </button>
         <input
           ref="receiptInput"
           class="sr-only"

@@ -43,6 +43,15 @@ export class FamiliesService {
       adminAccountId: family.adminAccountId,
       status: family.status,
       version: family.version,
+      defaultCity: family.defaultCityName
+        ? {
+            name: family.defaultCityName,
+            countryCode: family.defaultCityCountry!,
+            latitude: family.defaultCityLatitude!,
+            longitude: family.defaultCityLongitude!,
+            timezone: family.defaultCityTimezone!,
+          }
+        : null,
       role: family.adminAccountId === accountId ? "ADMIN" : "MEMBER",
       members: family.memberships.map(({ account }) => ({
         id: account.id,
@@ -60,6 +69,65 @@ export class FamiliesService {
     if (!membership) return null;
     const family = await this.loadFamily(membership.familyId);
     return family ? this.summary(family, accountId) : null;
+  }
+
+  async setDefaultCity(
+    familyId: string,
+    accountId: string,
+    input: {
+      version: number;
+      city: {
+        name: string;
+        countryCode: string;
+        latitude: number;
+        longitude: number;
+        timezone: string;
+      } | null;
+    },
+  ) {
+    await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`UPDATE families SET version = version WHERE id = ${familyId}::uuid`;
+      const family = await tx.family.findUnique({ where: { id: familyId } });
+      if (!family || family.status !== "ACTIVE") {
+        throw new NotFoundException({ code: "FAMILY_NOT_FOUND" });
+      }
+      const membership = await tx.membership.findFirst({
+        where: {
+          familyId,
+          accountId,
+          leftAt: null,
+          account: { status: "ACTIVE" },
+        },
+        select: { id: true },
+      });
+      if (!membership)
+        throw new NotFoundException({ code: "FAMILY_NOT_FOUND" });
+      if (family.version !== input.version) {
+        throw new ConflictException({ code: "VERSION_CONFLICT" });
+      }
+      const city = input.city;
+      await tx.family.update({
+        where: { id: familyId },
+        data: {
+          defaultCityName: city?.name ?? null,
+          defaultCityCountry: city?.countryCode ?? null,
+          defaultCityLatitude: city?.latitude ?? null,
+          defaultCityLongitude: city?.longitude ?? null,
+          defaultCityTimezone: city?.timezone ?? null,
+          version: { increment: 1 },
+        },
+      });
+      await tx.auditEvent.create({
+        data: {
+          actorId: accountId,
+          action: "FAMILY_DEFAULT_CITY_UPDATED",
+          subjectType: "FAMILY",
+          subjectId: familyId,
+          details: { city: city?.name ?? null },
+        },
+      });
+    });
+    return this.current(accountId);
   }
 
   async create(accountId: string, name: string) {

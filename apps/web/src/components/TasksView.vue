@@ -202,6 +202,18 @@ watch(categories, (nextCategories) => {
 onMounted(async () => {
   await load();
   if (props.initialAction === "create") openTask();
+  if (props.initialAction === "create-for-garment" && props.targetId) {
+    try {
+      const garment = await apiRequest<{ id: string; name: string }>(
+        `/wardrobe/garments/${props.targetId}`,
+      );
+      openTask();
+      taskForm.title = `维护：${garment.name}`.slice(0, 100);
+      taskForm.description = `关联衣物：/wardrobe/garments/${garment.id}`;
+    } catch {
+      notice.value = "无法读取这件衣物，请确认仍有访问权限。";
+    }
+  }
   if (props.initialAction === "pay" && canWrite.value) {
     let target = rules.value
       .flatMap((rule) => rule.occurrences)

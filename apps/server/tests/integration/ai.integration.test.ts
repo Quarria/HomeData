@@ -26,6 +26,8 @@ let ai: AiService;
 let accountId = "";
 let categoryId = "";
 let extractReceipt: ReturnType<typeof vi.fn>;
+let recommendDailyWardrobe: ReturnType<typeof vi.fn>;
+let recommendTripWardrobe: ReturnType<typeof vi.fn>;
 
 const input = {
   space: "personal" as const,
@@ -54,11 +56,15 @@ describe("user-triggered AI runs", () => {
     for (const migration of [
       "20261015000000_init/migration.sql",
       "20261015010000_identity/migration.sql",
+      "20261015010100_family_default_city/migration.sql",
       "20261015020000_ledger/migration.sql",
       "20261015030000_tasks_recurring/migration.sql",
       "20261015040000_recurring_effective_period/migration.sql",
       "20261015050000_share_snapshots/migration.sql",
       "20261015060000_ai_runs/migration.sql",
+      "20261020000000_wardrobe_core/migration.sql",
+      "20261021000000_wardrobe_owner_only/migration.sql",
+      "20261021010000_wardrobe_styling_advice/migration.sql",
     ]) {
       await database.exec(
         await readFile(
@@ -137,12 +143,160 @@ describe("user-triggered AI runs", () => {
         };
       }),
       extractReceipt,
+      recognizeWardrobe: vi.fn(async () => ({
+        data: {
+          name: "米色针织衫",
+          category: "TOP",
+          color: "米色",
+          stylingAdvice: "适合日常通勤，可搭配简洁的下装与外套。",
+          seasons: ["SPRING", "AUTUMN"],
+          layers: ["MID"],
+          scenes: ["CASUAL"],
+          thingsToVerify: [],
+        },
+        usage: { prompt_tokens: 60, completion_tokens: 20 },
+      })),
+      recommendDailyWardrobe: (recommendDailyWardrobe = vi.fn(
+        async (value: unknown) => {
+          expect(value).toMatchObject({
+            idea: "需要叠穿",
+            scene: "CASUAL",
+            condition: "MILD",
+            candidates: [
+              {
+                id: "daily-1",
+                items: [
+                  {
+                    name: "针织衫",
+                    role: "TOP",
+                    stylingAdvice: "适合日常通勤，可搭配简洁下装。",
+                  },
+                ],
+              },
+            ],
+          });
+          return {
+            data: {
+              recommendations: [
+                { id: "daily-1", reason: "根据你的叠穿想法选择了这套组合。" },
+              ],
+            },
+            usage: { prompt_tokens: 180, completion_tokens: 40 },
+          };
+        },
+      )),
+      recommendTripWardrobe: (recommendTripWardrobe = vi.fn(
+        async (value: unknown) => {
+          expect(value).toMatchObject({
+            scene: "CASUAL",
+            idea: "需要叠穿",
+            days: [
+              {
+                date: "2026-10-22",
+                condition: "COLD",
+                candidates: [
+                  { id: "2026-10-22:daily-1" },
+                  { id: "2026-10-22:daily-2" },
+                ],
+              },
+            ],
+          });
+          return {
+            data: {
+              days: [
+                {
+                  date: "2026-10-22",
+                  candidateId: "2026-10-22:daily-2",
+                  reason: "这天按你的想法选择了更适合降温的外套组合。",
+                },
+              ],
+            },
+            usage: { prompt_tokens: 240, completion_tokens: 50 },
+          };
+        },
+      )),
     } as unknown as AiProvider;
+    const candidate = {
+      id: "daily-1",
+      name: "休闲搭配 1",
+      scene: "CASUAL",
+      score: 10,
+      warnings: [],
+      reason: "规则版理由",
+      items: [
+        {
+          garmentId: randomUUID(),
+          role: "TOP",
+          sortOrder: 0,
+          name: "针织衫",
+          category: "TOP",
+          stylingAdvice: "适合日常通勤，可搭配简洁下装。",
+          imageUrl: "/api/v1/wardrobe/images/test/content?size=thumbnail",
+        },
+      ],
+    };
+    const wardrobeOutfits = {
+      recommendDaily: vi.fn(async () => ({
+        date: "2026-10-21",
+        scene: "CASUAL",
+        city: null,
+        weather: null,
+        weatherSource: null,
+        weatherError: null,
+        condition: "MILD",
+        recommendations: [{ ...candidate }],
+        message: null,
+      })),
+      recommendTrip: vi.fn(
+        async (_actorId: string, value: { startOn: string }) => {
+          const first = { ...candidate, id: "daily-1" };
+          const second = {
+            ...candidate,
+            id: "daily-2",
+            name: "休闲搭配 2",
+            items: candidate.items.map((item) => ({
+              ...item,
+              name: "轻薄外套",
+              role: "OUTER",
+            })),
+          };
+          return {
+            city: {
+              name: "京都",
+              countryCode: "JP",
+              latitude: 35,
+              longitude: 135,
+              timezone: "Asia/Tokyo",
+            },
+            timezone: "Asia/Tokyo",
+            startOn: value.startOn,
+            days: [
+              {
+                date: value.startOn,
+                weather: null,
+                condition: "COLD",
+                recommendation: first,
+                candidates: [first, second],
+                message: null,
+                weatherMissing: true,
+              },
+            ],
+            weatherSource: null,
+            weatherAttribution: null,
+            weatherFetchedAt: null,
+            weatherStale: false,
+            weatherError: null,
+          };
+        },
+      ),
+    };
     ai = new AiService(
       client,
       { read: async () => Buffer.from("private-image-bytes") } as never,
       new ReportsService(client),
       provider,
+      { read: async () => Buffer.from("private-wardrobe-image") } as never,
+      wardrobeOutfits as never,
     );
   }, 30_000);
 
@@ -226,6 +380,258 @@ describe("user-triggered AI runs", () => {
     });
     expect(await prisma!.expense.count()).toBe(1);
     expect(extractReceipt).toHaveBeenCalledOnce();
+  });
+
+  it("recognizes an owned temporary wardrobe image into a reviewable draft", async () => {
+    const image = await prisma!.wardrobeImage.create({
+      data: {
+        uploadedById: accountId,
+        storageKey: `wardrobe/${randomUUID()}.webp`,
+        thumbnailKey: `wardrobe/${randomUUID()}-thumb.webp`,
+        mimeType: "image/webp",
+        sizeBytes: 64,
+        width: 32,
+        height: 48,
+        contentHash: randomUUID()
+          .replaceAll("-", "a")
+          .slice(0, 64)
+          .padEnd(64, "a"),
+      },
+    });
+    const run = await ai.createWardrobeRecognition(
+      accountId,
+      image.id,
+      randomUUID(),
+    );
+    expect(run.status).toBe("PENDING");
+    expect(await ai.processNext()).toBe(true);
+    const completed = await ai.getRun(accountId, run.id);
+    expect(completed.status).toBe("SUCCEEDED");
+    expect(completed.result).toMatchObject({
+      name: "米色针织衫",
+      category: "TOP",
+      stylingAdvice: "适合日常通勤，可搭配简洁的下装与外套。",
+      seasons: ["SPRING", "AUTUMN"],
+    });
+    expect(await prisma!.expense.count()).toBe(1);
+    expect(
+      await prisma!.aiDailyUsage.findFirstOrThrow({
+        where: { accountId, bucket: "wardrobe_recognition" },
+      }),
+    ).toMatchObject({ reserved: 0, succeeded: 1 });
+  });
+
+  it("sends a user-entered outfit idea with candidates and stores AI selection", async () => {
+    const key = randomUUID();
+    const queued = await ai.createWardrobeRecommendation(
+      accountId,
+      {
+        mode: "DAILY",
+        scene: "CASUAL",
+        idea: "需要叠穿",
+        idempotencyKey: key,
+      },
+      key,
+    );
+    expect(queued.aiUsed).toBe(true);
+    expect(queued.run.status).toBe("PENDING");
+    expect(await ai.processNext()).toBe(true);
+    const completed = await ai.getRun(accountId, queued.run.id!);
+    expect(completed.status).toBe("SUCCEEDED");
+    expect(completed.result).toMatchObject({
+      recommendations: [
+        {
+          id: "daily-1",
+          reason: "根据你的叠穿想法选择了这套组合。",
+        },
+      ],
+    });
+    const usage = await prisma!.aiDailyUsage.findFirstOrThrow({
+      where: { accountId, bucket: "wardrobe_recommendation" },
+    });
+    expect(usage).toMatchObject({ reserved: 0, succeeded: 1 });
+  });
+
+  it("aggregates a trip into one AI run and selects only that day's candidates", async () => {
+    const key = randomUUID();
+    const queued = await ai.createWardrobeRecommendation(
+      accountId,
+      {
+        mode: "TRIP",
+        scene: "CASUAL",
+        city: {
+          name: "京都",
+          countryCode: "JP",
+          latitude: 35,
+          longitude: 135,
+          timezone: "Asia/Tokyo",
+        },
+        startOn: "2026-10-22",
+        days: 1,
+        idea: "需要叠穿",
+        idempotencyKey: key,
+      },
+      key,
+    );
+    expect(queued.aiUsed).toBe(true);
+    expect(
+      await prisma!.aiRun.count({ where: { type: "WARDROBE_RECOMMENDATION" } }),
+    ).toBe(2);
+    expect(await ai.processNext()).toBe(true);
+    const completed = await ai.getRun(accountId, queued.run.id!);
+    expect(completed.status).toBe("SUCCEEDED");
+    expect(completed.result).toMatchObject({
+      days: [
+        {
+          date: "2026-10-22",
+          recommendation: {
+            id: "daily-2",
+            reason: "这天按你的想法选择了更适合降温的外套组合。",
+          },
+        },
+      ],
+    });
+    expect(recommendTripWardrobe).toHaveBeenCalledOnce();
+  });
+
+  it("rejects model-invented outfit ids and releases the recommendation quota", async () => {
+    recommendDailyWardrobe.mockResolvedValueOnce({
+      data: {
+        recommendations: [
+          { id: "not-in-the-closet", reason: "模型不允许发明衣物。" },
+        ],
+      },
+      usage: { prompt_tokens: 100, completion_tokens: 20 },
+    });
+    const key = randomUUID();
+    const queued = await ai.createWardrobeRecommendation(
+      accountId,
+      {
+        mode: "DAILY",
+        scene: "CASUAL",
+        idea: "需要叠穿",
+        idempotencyKey: key,
+      },
+      key,
+    );
+    expect(await ai.processNext()).toBe(true);
+    const failed = await ai.getRun(accountId, queued.run.id!);
+    expect(failed.status).toBe("FAILED");
+    expect(failed.errorCode).toBe("AI_OUTPUT_INVALID");
+    expect(
+      await prisma!.aiDailyUsage.findFirstOrThrow({
+        where: { accountId, bucket: "wardrobe_recommendation" },
+      }),
+    ).toMatchObject({ reserved: 0, succeeded: 2 });
+  });
+
+  it("does not retry a transient wardrobe recommendation provider failure", async () => {
+    recommendDailyWardrobe.mockRejectedValueOnce({
+      code: "PROVIDER_UNAVAILABLE",
+      retryable: true,
+    });
+    const key = randomUUID();
+    const queued = await ai.createWardrobeRecommendation(
+      accountId,
+      {
+        mode: "DAILY",
+        scene: "CASUAL",
+        idea: "需要叠穿",
+        idempotencyKey: key,
+      },
+      key,
+    );
+
+    expect(await ai.processNext()).toBe(true);
+    const failed = await ai.getRun(accountId, queued.run.id!);
+    expect(failed.status).toBe("FAILED");
+    expect(failed.errorCode).toBe("PROVIDER_UNAVAILABLE");
+    expect(recommendDailyWardrobe).toHaveBeenCalledOnce();
+    expect(
+      await prisma!.aiDailyUsage.findFirstOrThrow({
+        where: { accountId, bucket: "wardrobe_recommendation" },
+      }),
+    ).toMatchObject({ reserved: 0 });
+  });
+
+  it("falls back to rules after the shared daily recommendation quota is used", async () => {
+    for (let index = 0; index < 3; index += 1) {
+      const key = randomUUID();
+      const queued = await ai.createWardrobeRecommendation(
+        accountId,
+        {
+          mode: "DAILY",
+          scene: "CASUAL",
+          idea: "需要叠穿",
+          idempotencyKey: key,
+        },
+        key,
+      );
+      expect(queued.aiUsed).toBe(true);
+      expect(await ai.processNext()).toBe(true);
+    }
+    const key = randomUUID();
+    const limited = await ai.createWardrobeRecommendation(
+      accountId,
+      {
+        mode: "DAILY",
+        scene: "CASUAL",
+        idea: "需要叠穿",
+        idempotencyKey: key,
+      },
+      key,
+    );
+    expect(limited.aiUsed).toBe(false);
+    expect(limited.notice).toContain("次数已用完");
+    expect(limited.run.result).toMatchObject({
+      recommendations: [{ id: "daily-1", reason: "规则版理由" }],
+    });
+  });
+
+  it("revokes a pending recognition after its image is gifted to another owner", async () => {
+    const recipient = await prisma!.account.create({
+      data: {
+        username: "wardrobe-recipient",
+        usernameNormalized: "wardrobe-recipient",
+        nickname: "收衣人",
+        passwordHash: "test-only",
+        mustChangePassword: false,
+      },
+    });
+    const image = await prisma!.wardrobeImage.create({
+      data: {
+        uploadedById: accountId,
+        storageKey: `wardrobe/${randomUUID()}.webp`,
+        thumbnailKey: `wardrobe/${randomUUID()}-thumb.webp`,
+        mimeType: "image/webp",
+        sizeBytes: 64,
+        width: 32,
+        height: 48,
+        contentHash: randomUUID()
+          .replaceAll("-", "b")
+          .slice(0, 64)
+          .padEnd(64, "b"),
+      },
+    });
+    const run = await ai.createWardrobeRecognition(
+      accountId,
+      image.id,
+      randomUUID(),
+    );
+    await prisma!.garment.create({
+      data: {
+        ownerId: recipient.id,
+        createdById: accountId,
+        mainImageId: image.id,
+        name: "转交给家庭成员",
+        category: "TOP",
+        visibility: "PRIVATE",
+      },
+    });
+    expect(await ai.processNext()).toBe(true);
+    const completed = await ai.getRun(accountId, run.id);
+    expect(completed.status).toBe("FAILED");
+    expect(completed.errorCode).toBe("WARDROBE_IMAGE_NOT_FOUND");
   });
 
   it("limits active plus completed requests in the Beijing business day", async () => {

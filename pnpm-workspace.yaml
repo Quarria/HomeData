@@ -6,6 +6,7 @@ allowBuilds:
   argon2: true
   esbuild: true
   prisma: true
+  sharp: set this to true or false
 minimumReleaseAgeExclude:
   - "@electric-sql/pglite-age@0.0.11"
   - "@electric-sql/pglite-pg_hashids@0.0.11"

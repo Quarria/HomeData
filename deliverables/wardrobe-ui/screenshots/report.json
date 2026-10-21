@@ -1,0 +1,89 @@
+[
+  {
+    "file": "garments-1440x900.png",
+    "state": "garments",
+    "size": "1440x900",
+    "zoom": 1,
+    "animationWaitMs": 0,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "trip-result-1440x900.png",
+    "state": "trip-result",
+    "size": "1440x900",
+    "zoom": 1,
+    "animationWaitMs": 0,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "entry-1440x900.png",
+    "state": "entry",
+    "size": "1440x900",
+    "zoom": 1,
+    "animationWaitMs": 0,
+    "issues": [
+      "图片没加载出来："
+    ],
+    "lint": []
+  },
+  {
+    "file": "garments-390x844.png",
+    "state": "garments",
+    "size": "390x844",
+    "zoom": 1,
+    "animationWaitMs": 0,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "trip-result-390x844.png",
+    "state": "trip-result",
+    "size": "390x844",
+    "zoom": 1,
+    "animationWaitMs": 0,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "entry-390x844.png",
+    "state": "entry",
+    "size": "390x844",
+    "zoom": 1,
+    "animationWaitMs": 0,
+    "issues": [
+      "图片没加载出来："
+    ],
+    "lint": []
+  },
+  {
+    "file": "garments-320x780.png",
+    "state": "garments",
+    "size": "320x780",
+    "zoom": 1,
+    "animationWaitMs": 0,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "trip-result-320x780.png",
+    "state": "trip-result",
+    "size": "320x780",
+    "zoom": 1,
+    "animationWaitMs": 0,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "entry-320x780.png",
+    "state": "entry",
+    "size": "320x780",
+    "zoom": 1,
+    "animationWaitMs": 0,
+    "issues": [
+      "图片没加载出来："
+    ],
+    "lint": []
+  }
+]

@@ -1002,6 +1002,22 @@ textarea:focus {
 .life-actions > .life-record:hover {
   background: #703044;
 }
+.life-wardrobe-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  margin-top: 12px;
+  padding: 0 2px;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-size: 13px;
+  cursor: pointer;
+}
+.life-wardrobe-link .ui-icon:last-child {
+  margin-left: auto;
+}
 .life-record small {
   color: #f3e3e7;
 }

@@ -1,0 +1,22 @@
+[
+  {
+    "file": "detail-seasons-390x844.png",
+    "state": "detail",
+    "size": "390x844",
+    "zoom": 1,
+    "group": "seasons",
+    "animationWaitMs": 19,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "detail-seasons-320x780.png",
+    "state": "detail",
+    "size": "320x780",
+    "zoom": 1,
+    "group": "seasons",
+    "animationWaitMs": 17,
+    "issues": [],
+    "lint": []
+  }
+]

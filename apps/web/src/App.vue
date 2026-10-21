@@ -11,6 +11,7 @@ import TasksView from "./components/TasksView.vue";
 import NotificationsView from "./components/NotificationsView.vue";
 import ReportsView from "./components/ReportsView.vue";
 import PublicShareView from "./components/PublicShareView.vue";
+import WardrobeView from "./components/wardrobe/WardrobeView.vue";
 import { useSessionStore } from "./stores/session";
 
 const session = useSessionStore();
@@ -32,41 +33,73 @@ const pages = [
   { id: "reports", title: "报表" },
   { id: "profile", title: "我的" },
 ] as const;
-const activePage = ref<(typeof pages)[number]["id"]>("home");
+const desktopPages = [...pages, { id: "wardrobe", title: "智能衣柜" }] as const;
+const activePage = ref<(typeof desktopPages)[number]["id"]>("home");
 const activeTitle = computed(
-  () => pages.find(({ id }) => id === activePage.value)?.title ?? "首页",
+  () => desktopPages.find(({ id }) => id === activePage.value)?.title ?? "首页",
 );
-const activeIndex = computed(() =>
-  pages.findIndex((page) => page.id === activePage.value),
+const desktopIndex = computed(() =>
+  desktopPages.findIndex((page) => page.id === activePage.value),
+);
+const mobileIndex = computed(() =>
+  Math.max(
+    0,
+    pages.findIndex((page) => page.id === activePage.value),
+  ),
 );
 const pageAction = ref("");
 const targetId = ref("");
 const receiptFile = ref<File>();
+const wardrobeExpenseDraft = ref<{
+  title: string;
+  categoryId: string;
+  occurredOn: string;
+  amount: string;
+  quantity?: string;
+  unit?: string;
+  unitPrice?: string;
+  note?: string;
+  familyId?: string;
+  receiptId?: string;
+}>();
 const pageComponents = {
   home: HomeView,
   ledger: LedgerView,
   tasks: TasksView,
   reports: ReportsView,
   profile: ProfileView,
+  wardrobe: WardrobeView,
 };
 const pageProps = computed(() =>
   activePage.value === "ledger"
-    ? { initialAction: pageAction.value, initialReceipt: receiptFile.value }
+    ? {
+        initialAction: pageAction.value,
+        initialReceipt: receiptFile.value,
+        resumeExpenseDraft: wardrobeExpenseDraft.value,
+      }
     : activePage.value === "tasks"
       ? { initialAction: pageAction.value, targetId: targetId.value }
       : activePage.value === "profile"
         ? { notice: passwordNotice.value }
-        : {},
+        : activePage.value === "wardrobe"
+          ? {
+              initialAction: pageAction.value,
+              targetId: targetId.value,
+              expenseDraft: wardrobeExpenseDraft.value,
+            }
+          : {},
 );
 function navigate(target: {
   page: typeof activePage.value;
   action?: string;
   id?: string;
   file?: File;
+  expenseDraft?: typeof wardrobeExpenseDraft.value;
 }) {
   pageAction.value = target.action ?? "";
   targetId.value = target.id ?? "";
   receiptFile.value = target.file;
+  if (target.expenseDraft) wardrobeExpenseDraft.value = target.expenseDraft;
   activePage.value = target.page;
   window.scrollTo({ top: 0, behavior: "instant" });
 }
@@ -154,11 +187,11 @@ function disableLeavingPage(element: Element) {
       <nav
         class="desktop-nav"
         aria-label="主导航"
-        :style="{ '--active-index': activeIndex }"
+        :style="{ '--active-index': desktopIndex }"
       >
         <span class="nav-selection" aria-hidden="true"></span>
         <button
-          v-for="page in pages"
+          v-for="page in desktopPages"
           :key="page.id"
           :class="['nav-item', { active: activePage === page.id }]"
           :aria-current="activePage === page.id ? 'page' : undefined"
@@ -285,6 +318,7 @@ function disableLeavingPage(element: Element) {
                 passwordNotice = '';
               "
               @logout="logout"
+              @draft-consumed="wardrobeExpenseDraft = undefined"
             />
           </section>
         </Transition>
@@ -297,7 +331,7 @@ function disableLeavingPage(element: Element) {
     <nav
       class="mobile-nav"
       aria-label="手机主导航"
-      :style="{ '--active-index': activeIndex }"
+      :style="{ '--active-index': mobileIndex }"
     >
       <span class="mobile-nav-selection" aria-hidden="true"></span>
       <button

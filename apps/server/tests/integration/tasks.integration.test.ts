@@ -38,6 +38,7 @@ describe("tasks, recurring fees, and inbox reminders", () => {
     for (const migration of [
       "20261015000000_init/migration.sql",
       "20261015010000_identity/migration.sql",
+      "20261015010100_family_default_city/migration.sql",
       "20261015020000_ledger/migration.sql",
       "20261015030000_tasks_recurring/migration.sql",
       "20261015040000_recurring_effective_period/migration.sql",

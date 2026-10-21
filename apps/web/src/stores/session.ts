@@ -18,6 +18,13 @@ export interface FamilySummary {
   adminAccountId: string;
   status: "ACTIVE" | "ARCHIVED";
   version: number;
+  defaultCity: {
+    name: string;
+    countryCode: string;
+    latitude: number;
+    longitude: number;
+    timezone: string;
+  } | null;
   role: "ADMIN" | "MEMBER";
   members: Array<{ id: string; username: string; nickname: string }>;
 }

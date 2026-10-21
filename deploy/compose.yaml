@@ -50,6 +50,7 @@ services:
     expose: ["3000"]
     volumes:
       - ${RECEIPTS_DATA_DIR:-/home/docker/homedata/receipts}:/data/receipts
+      - ${WARDROBE_DATA_DIR:-/home/docker/homedata/wardrobe}:/data/wardrobe
     networks: [private]
 
   worker:
@@ -67,6 +68,7 @@ services:
     restart: unless-stopped
     volumes:
       - ${RECEIPTS_DATA_DIR:-/home/docker/homedata/receipts}:/data/receipts
+      - ${WARDROBE_DATA_DIR:-/home/docker/homedata/wardrobe}:/data/wardrobe
     networks: [private]
 
   web:

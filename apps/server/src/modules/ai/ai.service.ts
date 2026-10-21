@@ -5,7 +5,11 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { reportQuerySchema } from "@homedata/contracts";
+import {
+  reportQuerySchema,
+  wardrobeDailyRecommendationRequestSchema,
+  wardrobeRecommendationRequestSchema,
+} from "@homedata/contracts";
 import { Prisma } from "../../../prisma/generated/client/client.js";
 import type { z } from "zod";
 import { PrismaService } from "../../shared/database/prisma.service.js";
@@ -13,11 +17,28 @@ import { ReceiptStorageService } from "../ledger/receipt-storage.service.js";
 import { ReportsService } from "../reports/reports.service.js";
 import { AiProvider, validateAnalysisOutput } from "./ai-provider.js";
 import { validateEnvironment } from "../../shared/config/environment.js";
+import { WardrobeImageStorageService } from "../wardrobe/wardrobe-image-storage.service.js";
+import { WardrobeOutfitService } from "../wardrobe/wardrobe-outfit.service.js";
 
 type ReportInput = z.infer<typeof reportQuerySchema>;
-type RunType = "RECEIPT_EXTRACTION" | "ANALYSIS";
+type WardrobeDailyInput = z.infer<
+  typeof wardrobeDailyRecommendationRequestSchema
+>;
+type WardrobeRecommendationInput = z.infer<
+  typeof wardrobeRecommendationRequestSchema
+>;
+type RunType =
+  | "RECEIPT_EXTRACTION"
+  | "ANALYSIS"
+  | "WARDROBE_RECOGNITION"
+  | "WARDROBE_RECOMMENDATION";
 
-const AI_LIMITS = { recognition: 20, analysis: 5 } as const;
+const AI_LIMITS = {
+  recognition: 20,
+  analysis: 5,
+  wardrobe_recognition: 10,
+  wardrobe_recommendation: 5,
+} as const;
 const MAX_ATTEMPTS = 2;
 const RUN_STALE_AFTER_MS = 5 * 60 * 1000;
 
@@ -51,12 +72,18 @@ function sameJson(left: unknown, right: unknown) {
 }
 
 function errorCode(error: unknown) {
-  return error &&
-    typeof error === "object" &&
-    "code" in error &&
-    typeof error.code === "string"
-    ? error.code
-    : "PROVIDER_UNAVAILABLE";
+  if (!error || typeof error !== "object") return "PROVIDER_UNAVAILABLE";
+  if ("code" in error && typeof error.code === "string") return error.code;
+  if (
+    "response" in error &&
+    error.response &&
+    typeof error.response === "object" &&
+    "code" in error.response &&
+    typeof error.response.code === "string"
+  ) {
+    return error.response.code;
+  }
+  return "PROVIDER_UNAVAILABLE";
 }
 
 function retryable(error: unknown) {
@@ -76,10 +103,23 @@ export class AiService {
     private readonly receiptStorage: ReceiptStorageService,
     @Inject(ReportsService) private readonly reports: ReportsService,
     @Inject(AiProvider) private readonly provider: AiProvider,
+    @Inject(WardrobeImageStorageService)
+    private readonly wardrobeImageStorage: WardrobeImageStorageService,
+    @Inject(WardrobeOutfitService)
+    private readonly wardrobeOutfits: WardrobeOutfitService,
   ) {}
 
   private bucket(type: RunType) {
-    return type === "ANALYSIS" ? "analysis" : "recognition";
+    switch (type) {
+      case "RECEIPT_EXTRACTION":
+        return "recognition";
+      case "ANALYSIS":
+        return "analysis";
+      case "WARDROBE_RECOGNITION":
+        return "wardrobe_recognition";
+      case "WARDROBE_RECOMMENDATION":
+        return "wardrobe_recommendation";
+    }
   }
 
   private async enqueue(
@@ -91,6 +131,7 @@ export class AiService {
       familyId?: string;
       membershipId?: string;
       receiptId?: string;
+      wardrobeImageId?: string;
     } = {},
   ) {
     const bucket = this.bucket(type);
@@ -129,6 +170,9 @@ export class AiService {
           ...(fields.familyId ? { familyId: fields.familyId } : {}),
           ...(fields.membershipId ? { membershipId: fields.membershipId } : {}),
           ...(fields.receiptId ? { receiptId: fields.receiptId } : {}),
+          ...(fields.wardrobeImageId
+            ? { wardrobeImageId: fields.wardrobeImageId }
+            : {}),
         },
       });
     });
@@ -186,6 +230,220 @@ export class AiService {
       { receiptId },
     );
     return this.runDto(run);
+  }
+
+  async createWardrobeRecognition(
+    actorId: string,
+    wardrobeImageId: string,
+    key: string,
+  ) {
+    this.assertConfigured();
+    const image = await this.prisma.wardrobeImage.findFirst({
+      where: { id: wardrobeImageId, uploadedById: actorId, garment: null },
+      select: { id: true, contentHash: true },
+    });
+    if (!image)
+      throw new NotFoundException({ code: "WARDROBE_IMAGE_NOT_FOUND" });
+    const cached = await this.prisma.aiRun.findFirst({
+      where: {
+        actorId,
+        type: "WARDROBE_RECOGNITION",
+        status: "SUCCEEDED",
+        wardrobeImage: { contentHash: image.contentHash },
+      },
+      orderBy: { finishedAt: "desc" },
+    });
+    if (cached) return this.runDto(cached);
+    const run = await this.enqueue(
+      actorId,
+      "WARDROBE_RECOGNITION",
+      key,
+      { wardrobeImageId },
+      { wardrobeImageId },
+    );
+    return this.runDto(run);
+  }
+
+  async createWardrobeRecommendation(
+    actorId: string,
+    input: WardrobeRecommendationInput,
+    key: string,
+  ) {
+    const dailyInput: WardrobeDailyInput = {
+      scene: input.scene,
+      ...(input.city ? { city: input.city } : {}),
+      ...(input.weatherCondition
+        ? { weatherCondition: input.weatherCondition }
+        : {}),
+      ...(input.idea ? { idea: input.idea } : {}),
+    };
+    let fallback: unknown;
+    let context: Prisma.InputJsonObject;
+    let candidateResults: unknown[] = [];
+    let candidateResultsByDay: Record<string, unknown[]> = {};
+    let hasCandidates = false;
+    if (input.mode === "TRIP") {
+      const trip = await this.wardrobeOutfits.recommendTrip(actorId, {
+        scene: input.scene,
+        city: input.city!,
+        startOn: input.startOn!,
+        days: input.days!,
+        ...(input.weatherCondition
+          ? { weatherCondition: input.weatherCondition }
+          : {}),
+        ...(input.idea ? { idea: input.idea } : {}),
+        candidateLimit: 2,
+      });
+      const { days, ...tripSummary } = trip;
+      hasCandidates = days.some((day) => (day.candidates?.length ?? 0) > 0);
+      fallback = {
+        ...tripSummary,
+        days: days.map(({ candidates: _candidates, ...day }) => day),
+      };
+      candidateResultsByDay = Object.fromEntries(
+        days.map((day) => [day.date, day.candidates ?? []]),
+      );
+      context = {
+        mode: "TRIP",
+        scene: input.scene,
+        idea: input.idea ?? "",
+        city: { name: input.city!.name, timezone: input.city!.timezone },
+        days: days.map((day) => ({
+          date: day.date,
+          weather: day.weather,
+          condition: day.condition,
+          candidates: (day.candidates ?? []).map((outfit) => ({
+            id: `${day.date}:${outfit.id}`,
+            outfitId: outfit.id,
+            name: outfit.name,
+            warnings: outfit.warnings,
+            items: outfit.items.map(
+              ({
+                garmentId,
+                name,
+                category,
+                role,
+                color,
+                seasons,
+                layers,
+                stylingAdvice,
+              }) => ({
+                garmentId,
+                name,
+                category,
+                role,
+                color,
+                seasons,
+                layers,
+                stylingAdvice,
+              }),
+            ),
+          })),
+        })),
+      } as Prisma.InputJsonObject;
+    } else {
+      const daily = await this.wardrobeOutfits.recommendDaily(actorId, {
+        ...dailyInput,
+        limit: 12,
+      });
+      fallback = {
+        ...daily,
+        recommendations: daily.recommendations.slice(0, 3),
+      };
+      candidateResults = daily.recommendations;
+      hasCandidates = daily.recommendations.length > 0;
+      context = {
+        mode: "DAILY",
+        scene: input.scene,
+        idea: input.idea ?? "",
+        city: daily.city
+          ? { name: daily.city.name, timezone: daily.city.timezone }
+          : null,
+        weather: daily.weather,
+        condition: daily.condition,
+        weatherConstraints:
+          daily.condition === "COLD" || daily.condition === "RAINY"
+            ? "优先保暖／防雨，不能为满足偏好移除必需外层"
+            : daily.condition === "WARM"
+              ? "避免为了叠穿偏好增加不必要的外层"
+              : "适中天气可参考用户的层次偏好",
+        candidates: daily.recommendations.map((outfit) => ({
+          id: outfit.id,
+          name: outfit.name,
+          warnings: outfit.warnings,
+          items: outfit.items.map(
+            ({
+              garmentId,
+              name,
+              category,
+              role,
+              color,
+              seasons,
+              layers,
+              stylingAdvice,
+            }) => ({
+              garmentId,
+              name,
+              category,
+              color,
+              seasons,
+              layers,
+              stylingAdvice,
+              role,
+            }),
+          ),
+        })),
+      } as Prisma.InputJsonObject;
+    }
+
+    if (!hasCandidates) {
+      return {
+        run: { id: null, status: "SUCCEEDED", result: fallback },
+        fallback,
+        aiUsed: false,
+        notice: null,
+      };
+    }
+    const config = validateEnvironment();
+    if (config.AI_PROVIDER === "disabled" || !config.AI_API_KEY) {
+      return {
+        run: { id: null, status: "SUCCEEDED", result: fallback },
+        fallback,
+        aiUsed: false,
+        notice: "AI 尚未配置，已使用规则搭配。",
+      };
+    }
+    try {
+      const jobInput = JSON.parse(
+        JSON.stringify({
+          mode: input.mode,
+          context,
+          fallback,
+          ...(input.mode === "DAILY" ? { candidateResults } : {}),
+          ...(input.mode === "TRIP" ? { candidateResultsByDay } : {}),
+        }),
+      ) as Prisma.InputJsonObject;
+      const run = await this.enqueue(
+        actorId,
+        "WARDROBE_RECOMMENDATION",
+        key,
+        jobInput,
+      );
+      return { run: this.runDto(run), fallback, aiUsed: true, notice: null };
+    } catch (error) {
+      if (
+        error instanceof ConflictException &&
+        (error.getResponse() as { code?: string }).code === "AI_QUOTA_EXCEEDED"
+      ) {
+        return {
+          run: { id: null, status: "SUCCEEDED", result: fallback },
+          fallback,
+          aiUsed: false,
+          notice: "今日 AI 穿搭推荐次数已用完，已使用规则搭配。",
+        };
+      }
+      throw error;
+    }
   }
 
   async createAnalysis(actorId: string, input: ReportInput, key: string) {
@@ -421,7 +679,7 @@ export class AiService {
                 : null,
           })),
         };
-      } else {
+      } else if (claimed.type === "ANALYSIS") {
         const safeInput = claimed.input as {
           evidence: Array<{ id: string; label: string; value: string }>;
         };
@@ -437,6 +695,125 @@ export class AiService {
           evidence: validated.evidence.map(({ id }) => byId.get(id)),
           thingsToVerify: validated.thingsToVerify,
         };
+      } else if (claimed.type === "WARDROBE_RECOGNITION") {
+        const imageId = (claimed.input as { wardrobeImageId: string })
+          .wardrobeImageId;
+        const image = await this.loadWardrobeImage(claimed.actorId, imageId);
+        const recognition = await this.provider.recognizeWardrobe({
+          image: await this.wardrobeImageStorage.read(image.storageKey),
+          mime: image.mimeType,
+        });
+        usage = recognition.usage;
+        result = recognition.data;
+      } else if (claimed.type === "WARDROBE_RECOMMENDATION") {
+        const input = claimed.input as {
+          mode: "DAILY" | "TRIP";
+          context: Prisma.JsonObject;
+          fallback: Prisma.JsonObject;
+          candidateResults?: Array<{ id: string; [key: string]: unknown }>;
+          candidateResultsByDay?: Record<
+            string,
+            Array<{ id: string; [key: string]: unknown }>
+          >;
+        };
+        if (input.mode === "DAILY") {
+          const recommendation = await this.provider.recommendDailyWardrobe(
+            input.context,
+          );
+          usage = recommendation.usage;
+          const candidates = input.context.candidates as Array<{
+            id: string;
+          }>;
+          const candidateIds = new Set(candidates.map(({ id }) => id));
+          const selectedIds = recommendation.data.recommendations.map(
+            ({ id }) => id,
+          );
+          if (
+            new Set(selectedIds).size !== selectedIds.length ||
+            selectedIds.some((id) => !candidateIds.has(id))
+          ) {
+            throw Object.assign(new Error("AI_OUTPUT_INVALID"), {
+              code: "AI_OUTPUT_INVALID",
+              retryable: false,
+            });
+          }
+          const fallback = input.fallback as {
+            recommendations: Array<{ id: string }>;
+          };
+          const allResults = input.candidateResults ?? [];
+          const fallbackById = new Map(
+            [...fallback.recommendations, ...allResults].map((item) => [
+              item.id,
+              item,
+            ]),
+          );
+          const recommendations = recommendation.data.recommendations.map(
+            ({ id, reason }) => ({ ...fallbackById.get(id), reason }),
+          );
+          result = {
+            ...input.fallback,
+            recommendations,
+          } as Prisma.InputJsonObject;
+        } else {
+          const recommendation = await this.provider.recommendTripWardrobe(
+            input.context,
+          );
+          usage = recommendation.usage;
+          const tripContext = input.context.days as Array<{
+            date: string;
+            candidates: Array<{ id: string; outfitId: string }>;
+          }>;
+          const selections = new Map<string, string>();
+          for (const selection of recommendation.data.days) {
+            const day = tripContext.find(({ date }) => date === selection.date);
+            if (
+              !day ||
+              !day.candidates.some(({ id }) => id === selection.candidateId) ||
+              selections.has(selection.date)
+            ) {
+              throw Object.assign(new Error("AI_OUTPUT_INVALID"), {
+                code: "AI_OUTPUT_INVALID",
+                retryable: false,
+              });
+            }
+            selections.set(selection.date, selection.candidateId);
+          }
+          const tripFallback = input.fallback as {
+            days: Array<Record<string, unknown> & { date: string }>;
+          };
+          const selectedDays = tripFallback.days.map((day) => {
+            const selectedId = selections.get(day.date);
+            if (!selectedId) return day;
+            const sourceDay = tripContext.find(
+              ({ date }) => date === day.date,
+            )!;
+            const selected = sourceDay.candidates.find(
+              ({ id }) => id === selectedId,
+            )!;
+            const fullCandidate = (
+              input.candidateResultsByDay?.[day.date] ?? []
+            ).find(({ id }) => id === selected.outfitId);
+            if (!fullCandidate) {
+              throw Object.assign(new Error("AI_OUTPUT_INVALID"), {
+                code: "AI_OUTPUT_INVALID",
+                retryable: false,
+              });
+            }
+            const reason = recommendation.data.days.find(
+              ({ date }) => date === day.date,
+            )!.reason;
+            return {
+              ...day,
+              recommendation: { ...fullCandidate, reason },
+            };
+          });
+          result = {
+            ...input.fallback,
+            days: selectedDays,
+          } as Prisma.InputJsonObject;
+        }
+      } else {
+        throw new Error("AI_HANDLER_UNAVAILABLE");
       }
       if (!(await this.executionAccess(claimed))) {
         await this.cancel(claimed.id);
@@ -469,7 +846,14 @@ export class AiService {
         }
       });
     } catch (error) {
-      if (retryable(error) && claimed.attempts < MAX_ATTEMPTS) {
+      // A recommendation is explicitly a one-click, one-provider-attempt operation.
+      // Retrying after a timeout/5xx can incur a second charge if the provider
+      // completed the first request but its response was lost.
+      if (
+        claimed.type !== "WARDROBE_RECOMMENDATION" &&
+        retryable(error) &&
+        claimed.attempts < MAX_ATTEMPTS
+      ) {
         await this.prisma.aiRun.updateMany({
           where: { id: claimed.id, status: "RUNNING" },
           data: { status: "PENDING" },
@@ -539,7 +923,10 @@ export class AiService {
       orderBy: { startedAt: "asc" },
     });
     for (const run of stale) {
-      if (run.attempts < MAX_ATTEMPTS) {
+      if (
+        run.type !== "WARDROBE_RECOMMENDATION" &&
+        run.attempts < MAX_ATTEMPTS
+      ) {
         await this.prisma.aiRun.updateMany({
           where: {
             id: run.id,
@@ -617,5 +1004,25 @@ export class AiService {
       buffer: await this.receiptStorage.read(receipt.storageKey),
       mimeType: receipt.mimeType,
     };
+  }
+
+  private async loadWardrobeImage(actorId: string, imageId: string) {
+    const image = await this.prisma.wardrobeImage.findUnique({
+      where: { id: imageId },
+      select: {
+        uploadedById: true,
+        storageKey: true,
+        mimeType: true,
+        garment: { select: { ownerId: true } },
+      },
+    });
+    if (
+      !image ||
+      image.uploadedById !== actorId ||
+      (image.garment && image.garment.ownerId !== actorId)
+    ) {
+      throw new NotFoundException({ code: "WARDROBE_IMAGE_NOT_FOUND" });
+    }
+    return image;
   }
 }

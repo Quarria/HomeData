@@ -17,7 +17,7 @@ const RESTORE_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 const IDEMPOTENCY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 type Scope = "personal" | "family";
-type ExpenseInput = {
+export type ExpenseInput = {
   title: string;
   categoryId: string;
   occurredOn: string;
@@ -160,66 +160,82 @@ export class LedgerService {
     accountId: string,
     confirmFamilyVisible: boolean,
   ) {
-    return this.prisma.$transaction(async (tx) => {
-      const expense = await tx.expense.findUnique({ where: { id: expenseId } });
-      if (!expense || expense.deletedAt)
-        throw new NotFoundException({ code: "EXPENSE_NOT_FOUND" });
-      await this.assertWritable(tx, expense, accountId);
-      const receipt = await tx.receipt.findUnique({
-        where: { id: receiptId },
-        include: {
-          links: { include: { expense: { select: { familyId: true } } } },
-        },
-      });
-      if (!receipt || receipt.uploadedById !== accountId)
-        throw new NotFoundException({ code: "RECEIPT_NOT_FOUND" });
-      const canShareWithFamily =
-        Boolean(expense.familyId) &&
-        confirmFamilyVisible &&
-        receipt.links.length === 0;
-      const mustRemainPrivate =
-        !expense.familyId ||
-        receipt.links.some(
-          ({ expense: linkedExpense }) =>
-            !linkedExpense.familyId ||
-            linkedExpense.familyId !== expense.familyId,
-        );
-      if (mustRemainPrivate) {
-        await tx.receipt.update({
-          where: { id: receiptId },
-          data: { privacyLock: "PRIVATE" },
-        });
-      } else if (canShareWithFamily) {
-        await tx.receipt.update({
-          where: { id: receiptId },
-          data: { privacyLock: "FAMILY" },
-        });
-      }
-      const link = await tx.receiptLink.upsert({
-        where: { receiptId_expenseId: { receiptId, expenseId } },
-        create: { receiptId, expenseId },
-        update: {},
-        select: { id: true },
-      });
-      await tx.auditEvent.create({
-        data: {
-          actorId: accountId,
-          action: "RECEIPT_LINKED",
-          subjectType: "EXPENSE",
-          subjectId: expenseId,
-          details: { receiptId },
-        },
-      });
-      return {
-        id: link.id,
+    return this.prisma.$transaction((tx) =>
+      this.linkReceiptInTransaction(
+        tx,
+        expenseId,
         receiptId,
-        privacy: mustRemainPrivate
-          ? "PRIVATE"
-          : canShareWithFamily
-            ? "FAMILY"
-            : receipt.privacyLock,
-      };
+        accountId,
+        confirmFamilyVisible,
+      ),
+    );
+  }
+
+  async linkReceiptInTransaction(
+    tx: Prisma.TransactionClient,
+    expenseId: string,
+    receiptId: string,
+    accountId: string,
+    confirmFamilyVisible: boolean,
+  ) {
+    const expense = await tx.expense.findUnique({ where: { id: expenseId } });
+    if (!expense || expense.deletedAt)
+      throw new NotFoundException({ code: "EXPENSE_NOT_FOUND" });
+    await this.assertWritable(tx, expense, accountId);
+    const receipt = await tx.receipt.findUnique({
+      where: { id: receiptId },
+      include: {
+        links: { include: { expense: { select: { familyId: true } } } },
+      },
     });
+    if (!receipt || receipt.uploadedById !== accountId)
+      throw new NotFoundException({ code: "RECEIPT_NOT_FOUND" });
+    const canShareWithFamily =
+      Boolean(expense.familyId) &&
+      confirmFamilyVisible &&
+      receipt.links.length === 0;
+    const mustRemainPrivate =
+      !expense.familyId ||
+      receipt.links.some(
+        ({ expense: linkedExpense }) =>
+          !linkedExpense.familyId ||
+          linkedExpense.familyId !== expense.familyId,
+      );
+    if (mustRemainPrivate) {
+      await tx.receipt.update({
+        where: { id: receiptId },
+        data: { privacyLock: "PRIVATE" },
+      });
+    } else if (canShareWithFamily) {
+      await tx.receipt.update({
+        where: { id: receiptId },
+        data: { privacyLock: "FAMILY" },
+      });
+    }
+    const link = await tx.receiptLink.upsert({
+      where: { receiptId_expenseId: { receiptId, expenseId } },
+      create: { receiptId, expenseId },
+      update: {},
+      select: { id: true },
+    });
+    await tx.auditEvent.create({
+      data: {
+        actorId: accountId,
+        action: "RECEIPT_LINKED",
+        subjectType: "EXPENSE",
+        subjectId: expenseId,
+        details: { receiptId },
+      },
+    });
+    return {
+      id: link.id,
+      receiptId,
+      privacy: mustRemainPrivate
+        ? "PRIVATE"
+        : canShareWithFamily
+          ? "FAMILY"
+          : receipt.privacyLock,
+    };
   }
 
   async unlinkReceipt(
@@ -552,7 +568,7 @@ export class LedgerService {
     return this.readExpense(expenseId, accountId);
   }
 
-  private async idempotent<T>(
+  async runIdempotentTransaction<T>(
     accountId: string,
     operation: string,
     key: string,
@@ -618,57 +634,72 @@ export class LedgerService {
   }
 
   async create(accountId: string, input: ExpenseInput, key: string) {
-    return this.idempotent(
+    return this.runIdempotentTransaction(
       accountId,
       "expense.create",
       key,
       input,
-      async (tx) => {
-        await this.assertTargetFamily(tx, input.familyId, accountId);
-        const category = await tx.category.findUnique({
-          where: { id: input.categoryId },
-        });
-        if (!category || !category.isActive) {
-          throw new ConflictException({ code: "CATEGORY_UNAVAILABLE" });
-        }
-        const expense = await tx.expense.create({
-          data: {
-            payerId: accountId,
-            familyId: input.familyId ?? null,
-            categoryId: input.categoryId,
-            title: input.title,
-            occurredOn: date(input.occurredOn),
-            amountCents: cents(input.amount),
-            quantity: input.quantity
-              ? new Prisma.Decimal(input.quantity)
-              : null,
-            unit: input.unit ?? null,
-            unitPrice: input.unitPrice
-              ? new Prisma.Decimal(input.unitPrice)
-              : null,
-            note: input.note || null,
-          },
-        });
-        await tx.auditEvent.create({
-          data: {
-            actorId: accountId,
-            action: "EXPENSE_CREATED",
-            subjectType: "EXPENSE",
-            subjectId: expense.id,
-            details: {
-              amount: input.amount,
-              familyId: input.familyId ?? null,
-              categoryId: input.categoryId,
-            },
-          },
-        });
-        const result = await tx.expense.findUniqueOrThrow({
-          where: { id: expense.id },
-          include: expenseInclude,
-        });
-        return this.dto(result, accountId, true);
-      },
+      (tx) => this.createInTransaction(tx, accountId, input),
     );
+  }
+
+  async createInTransaction(
+    tx: Prisma.TransactionClient,
+    accountId: string,
+    input: ExpenseInput,
+  ) {
+    await this.assertTargetFamily(tx, input.familyId, accountId);
+    const category = await tx.category.findUnique({
+      where: { id: input.categoryId },
+    });
+    if (!category || !category.isActive) {
+      throw new ConflictException({ code: "CATEGORY_UNAVAILABLE" });
+    }
+    const expense = await tx.expense.create({
+      data: {
+        payerId: accountId,
+        familyId: input.familyId ?? null,
+        categoryId: input.categoryId,
+        title: input.title,
+        occurredOn: date(input.occurredOn),
+        amountCents: cents(input.amount),
+        quantity: input.quantity ? new Prisma.Decimal(input.quantity) : null,
+        unit: input.unit ?? null,
+        unitPrice: input.unitPrice ? new Prisma.Decimal(input.unitPrice) : null,
+        note: input.note || null,
+      },
+    });
+    await tx.auditEvent.create({
+      data: {
+        actorId: accountId,
+        action: "EXPENSE_CREATED",
+        subjectType: "EXPENSE",
+        subjectId: expense.id,
+        details: {
+          amount: input.amount,
+          familyId: input.familyId ?? null,
+          categoryId: input.categoryId,
+        },
+      },
+    });
+    const result = await tx.expense.findUniqueOrThrow({
+      where: { id: expense.id },
+      include: expenseInclude,
+    });
+    return this.dto(result, accountId, true);
+  }
+
+  async assertWritableExpense(
+    tx: Prisma.TransactionClient,
+    expenseId: string,
+    accountId: string,
+  ) {
+    const current = await tx.expense.findUnique({ where: { id: expenseId } });
+    if (!current || current.deletedAt) {
+      throw new NotFoundException({ code: "EXPENSE_NOT_FOUND" });
+    }
+    await this.assertWritable(tx, current, accountId);
+    return this.lockExpense(tx, expenseId);
   }
 
   async update(expenseId: string, accountId: string, input: ExpensePatchInput) {
@@ -944,7 +975,7 @@ export class LedgerService {
     input: { amount: string; occurredOn: string },
     key: string,
   ) {
-    return this.idempotent(
+    return this.runIdempotentTransaction(
       accountId,
       "refund.create",
       key,

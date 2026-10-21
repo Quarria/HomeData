@@ -15,6 +15,7 @@ import { TasksModule } from "./tasks/tasks.module.js";
 import { ReportsModule } from "./reports/reports.module.js";
 import { SharesModule } from "./shares/shares.module.js";
 import { AiModule } from "./ai/ai.module.js";
+import { WardrobeModule } from "./wardrobe/wardrobe.module.js";
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { AiModule } from "./ai/ai.module.js";
     ReportsModule,
     SharesModule,
     AiModule,
+    WardrobeModule,
   ],
   providers: [
     AppLogger,

@@ -1,0 +1,29 @@
+[
+  {
+    "file": "garments-1440x900.png",
+    "state": "garments",
+    "size": "1440x900",
+    "zoom": 1,
+    "animationWaitMs": 0,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "garments-390x844.png",
+    "state": "garments",
+    "size": "390x844",
+    "zoom": 1,
+    "animationWaitMs": 0,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "garments-320x780.png",
+    "state": "garments",
+    "size": "320x780",
+    "zoom": 1,
+    "animationWaitMs": 0,
+    "issues": [],
+    "lint": []
+  }
+]

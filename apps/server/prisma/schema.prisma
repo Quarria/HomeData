@@ -30,6 +30,58 @@ enum ReceiptPrivacy {
 enum AiRunType {
   RECEIPT_EXTRACTION
   ANALYSIS
+  WARDROBE_RECOGNITION
+  WARDROBE_RECOMMENDATION
+}
+
+enum GarmentCategory {
+  TOP
+  OUTERWEAR
+  BOTTOM
+  ONE_PIECE
+  SHOES
+  ACCESSORY
+}
+
+enum GarmentSeason {
+  SPRING
+  SUMMER
+  AUTUMN
+  WINTER
+}
+
+enum GarmentLayer {
+  INNER
+  MID
+  OUTER
+}
+
+enum GarmentScene {
+  COMMUTE
+  CASUAL
+  SPORT
+}
+
+enum GarmentStatus {
+  WEARABLE
+  LAUNDERING
+  STORED
+  RETIRED
+}
+
+enum GarmentVisibility {
+  PRIVATE
+  FAMILY
+}
+
+enum OutfitItemRole {
+  TOP
+  MID
+  OUTER
+  BOTTOM
+  ONE_PIECE
+  SHOES
+  ACCESSORY
 }
 
 enum AiRunStatus {
@@ -108,6 +160,10 @@ model Account {
   shareSnapshots       ShareSnapshot[]
   aiRuns               AiRun[]
   aiDailyUsage         AiDailyUsage[]
+  garmentsOwned        Garment[]           @relation("GarmentOwner")
+  garmentsCreated      Garment[]           @relation("GarmentCreator")
+  wardrobeImages       WardrobeImage[]
+  outfits              Outfit[]
 
   @@map("accounts")
 }
@@ -129,37 +185,44 @@ model Session {
 }
 
 model Family {
-  id                String            @id @default(uuid()) @db.Uuid
-  name              String            @db.VarChar(80)
-  adminAccountId    String            @map("admin_account_id") @db.Uuid
-  status            FamilyStatus      @default(ACTIVE)
-  archivedAt        DateTime?         @map("archived_at") @db.Timestamptz(3)
-  version           Int               @default(1)
-  createdAt         DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt         DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
-  admin             Account           @relation("FamilyAdministrator", fields: [adminAccountId], references: [id], onDelete: Restrict)
-  memberships       Membership[]
-  expenses          Expense[]
-  tasks             Task[]
-  recurringRules    RecurringRule[]
-  shareSnapshots    ShareSnapshot[]
-  shareDependencies ShareDependency[]
-  aiRuns            AiRun[]
+  id                   String            @id @default(uuid()) @db.Uuid
+  name                 String            @db.VarChar(80)
+  adminAccountId       String            @map("admin_account_id") @db.Uuid
+  status               FamilyStatus      @default(ACTIVE)
+  archivedAt           DateTime?         @map("archived_at") @db.Timestamptz(3)
+  defaultCityName      String?           @map("default_city_name") @db.VarChar(120)
+  defaultCityCountry   String?           @map("default_city_country") @db.VarChar(2)
+  defaultCityLatitude  Float?            @map("default_city_latitude")
+  defaultCityLongitude Float?            @map("default_city_longitude")
+  defaultCityTimezone  String?           @map("default_city_timezone") @db.VarChar(64)
+  version              Int               @default(1)
+  createdAt            DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+  admin                Account           @relation("FamilyAdministrator", fields: [adminAccountId], references: [id], onDelete: Restrict)
+  memberships          Membership[]
+  expenses             Expense[]
+  tasks                Task[]
+  recurringRules       RecurringRule[]
+  shareSnapshots       ShareSnapshot[]
+  shareDependencies    ShareDependency[]
+  aiRuns               AiRun[]
+  garments             Garment[]
 
   @@index([adminAccountId, status])
   @@map("families")
 }
 
 model Membership {
-  id          String    @id @default(uuid()) @db.Uuid
-  familyId    String    @map("family_id") @db.Uuid
-  accountId   String    @map("account_id") @db.Uuid
-  joinedAt    DateTime  @default(now()) @map("joined_at") @db.Timestamptz(3)
-  leftAt      DateTime? @map("left_at") @db.Timestamptz(3)
-  leaveReason String?   @map("leave_reason") @db.VarChar(32)
-  family      Family    @relation(fields: [familyId], references: [id], onDelete: Restrict)
-  account     Account   @relation(fields: [accountId], references: [id], onDelete: Restrict)
-  aiRuns      AiRun[]
+  id            String         @id @default(uuid()) @db.Uuid
+  familyId      String         @map("family_id") @db.Uuid
+  accountId     String         @map("account_id") @db.Uuid
+  joinedAt      DateTime       @default(now()) @map("joined_at") @db.Timestamptz(3)
+  leftAt        DateTime?      @map("left_at") @db.Timestamptz(3)
+  leaveReason   String?        @map("leave_reason") @db.VarChar(32)
+  family        Family         @relation(fields: [familyId], references: [id], onDelete: Restrict)
+  account       Account        @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  aiRuns        AiRun[]
+  garmentShares GarmentShare[]
 
   @@index([familyId, leftAt, joinedAt])
   @@index([accountId, leftAt])
@@ -204,6 +267,7 @@ model Expense {
   family              Family?       @relation(fields: [familyId], references: [id], onDelete: Restrict)
   category            Category      @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   refunds             Refund[]
+  wardrobeGarments    Garment[]
   receiptLinks        ReceiptLink[]
   occurrence          Occurrence?   @relation("OccurrencePayments", fields: [occurrenceId], references: [id], onDelete: Restrict)
   activeForOccurrence Occurrence?   @relation("OccurrenceActiveExpense")
@@ -467,27 +531,29 @@ model ShareUnlockAttempt {
 }
 
 model AiRun {
-  id             String      @id @default(uuid()) @db.Uuid
-  actorId        String      @map("actor_id") @db.Uuid
-  familyId       String?     @map("family_id") @db.Uuid
-  membershipId   String?     @map("membership_id") @db.Uuid
-  receiptId      String?     @map("receipt_id") @db.Uuid
-  type           AiRunType
-  status         AiRunStatus @default(PENDING)
-  idempotencyKey String      @map("idempotency_key") @db.Uuid
-  input          Json        @db.JsonB
-  result         Json?       @db.JsonB
-  errorCode      String?     @map("error_code") @db.VarChar(40)
-  providerUsage  Json?       @map("provider_usage") @db.JsonB
-  usageDate      DateTime    @map("usage_date") @db.Date
-  attempts       Int         @default(0)
-  createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
-  startedAt      DateTime?   @map("started_at") @db.Timestamptz(3)
-  finishedAt     DateTime?   @map("finished_at") @db.Timestamptz(3)
-  actor          Account     @relation(fields: [actorId], references: [id], onDelete: Restrict)
-  family         Family?     @relation(fields: [familyId], references: [id], onDelete: Restrict)
-  membership     Membership? @relation(fields: [membershipId], references: [id], onDelete: Restrict)
-  receipt        Receipt?    @relation(fields: [receiptId], references: [id], onDelete: Restrict)
+  id              String         @id @default(uuid()) @db.Uuid
+  actorId         String         @map("actor_id") @db.Uuid
+  familyId        String?        @map("family_id") @db.Uuid
+  membershipId    String?        @map("membership_id") @db.Uuid
+  receiptId       String?        @map("receipt_id") @db.Uuid
+  wardrobeImageId String?        @map("wardrobe_image_id") @db.Uuid
+  type            AiRunType
+  status          AiRunStatus    @default(PENDING)
+  idempotencyKey  String         @map("idempotency_key") @db.Uuid
+  input           Json           @db.JsonB
+  result          Json?          @db.JsonB
+  errorCode       String?        @map("error_code") @db.VarChar(40)
+  providerUsage   Json?          @map("provider_usage") @db.JsonB
+  usageDate       DateTime       @map("usage_date") @db.Date
+  attempts        Int            @default(0)
+  createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  startedAt       DateTime?      @map("started_at") @db.Timestamptz(3)
+  finishedAt      DateTime?      @map("finished_at") @db.Timestamptz(3)
+  actor           Account        @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  family          Family?        @relation(fields: [familyId], references: [id], onDelete: Restrict)
+  membership      Membership?    @relation(fields: [membershipId], references: [id], onDelete: Restrict)
+  receipt         Receipt?       @relation(fields: [receiptId], references: [id], onDelete: Restrict)
+  wardrobeImage   WardrobeImage? @relation(fields: [wardrobeImageId], references: [id], onDelete: Restrict)
 
   @@unique([actorId, idempotencyKey])
   @@index([status, createdAt])
@@ -499,7 +565,7 @@ model AiRun {
 model AiDailyUsage {
   accountId String   @map("account_id") @db.Uuid
   usageDate DateTime @map("usage_date") @db.Date
-  bucket    String   @db.VarChar(16)
+  bucket    String   @db.VarChar(32)
   reserved  Int      @default(0)
   succeeded Int      @default(0)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
@@ -507,4 +573,122 @@ model AiDailyUsage {
 
   @@id([accountId, usageDate, bucket])
   @@map("ai_daily_usage")
+}
+
+model Garment {
+  id              String            @id @default(uuid()) @db.Uuid
+  ownerId         String            @map("owner_id") @db.Uuid
+  createdById     String            @map("created_by_id") @db.Uuid
+  familyId        String?           @map("family_id") @db.Uuid
+  mainImageId     String            @unique @map("main_image_id") @db.Uuid
+  expenseId       String?           @map("expense_id") @db.Uuid
+  name            String            @db.VarChar(100)
+  category        GarmentCategory
+  color           String?           @db.VarChar(40)
+  stylingAdvice   String?           @map("styling_advice") @db.VarChar(80)
+  seasons         GarmentSeason[]   @default([])
+  layers          GarmentLayer[]    @default([])
+  scenes          GarmentScene[]    @default([])
+  status          GarmentStatus     @default(WEARABLE)
+  visibility      GarmentVisibility @default(PRIVATE)
+  storageLocation String?           @map("storage_location") @db.VarChar(100)
+  notes           String?           @db.VarChar(500)
+  acquiredOn      DateTime?         @map("acquired_on") @db.Date
+  version         Int               @default(1)
+  deletedAt       DateTime?         @map("deleted_at") @db.Timestamptz(3)
+  createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+  owner           Account           @relation("GarmentOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  createdBy       Account           @relation("GarmentCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  family          Family?           @relation(fields: [familyId], references: [id], onDelete: Restrict)
+  mainImage       WardrobeImage     @relation(fields: [mainImageId], references: [id], onDelete: Restrict)
+  expense         Expense?          @relation(fields: [expenseId], references: [id], onDelete: Restrict)
+  shares          GarmentShare[]
+  outfitItems     OutfitItem[]
+
+  @@index([ownerId, deletedAt, status, id])
+  @@index([familyId, visibility, deletedAt])
+  @@index([expenseId])
+  @@map("garments")
+}
+
+model WardrobeImage {
+  id           String   @id @default(uuid()) @db.Uuid
+  uploadedById String   @map("uploaded_by_id") @db.Uuid
+  storageKey   String   @unique @map("storage_key") @db.VarChar(255)
+  thumbnailKey String   @unique @map("thumbnail_key") @db.VarChar(255)
+  mimeType     String   @map("mime_type") @db.VarChar(40)
+  sizeBytes    Int      @map("size_bytes")
+  width        Int
+  height       Int
+  contentHash  String   @map("content_hash") @db.Char(64)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  uploadedBy   Account  @relation(fields: [uploadedById], references: [id], onDelete: Restrict)
+  garment      Garment?
+  aiRuns       AiRun[]
+
+  @@index([uploadedById, createdAt])
+  @@index([contentHash])
+  @@map("wardrobe_images")
+}
+
+model GarmentShare {
+  id           String     @id @default(uuid()) @db.Uuid
+  garmentId    String     @map("garment_id") @db.Uuid
+  membershipId String     @map("membership_id") @db.Uuid
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  garment      Garment    @relation(fields: [garmentId], references: [id], onDelete: Restrict)
+  membership   Membership @relation(fields: [membershipId], references: [id], onDelete: Restrict)
+
+  @@unique([garmentId, membershipId])
+  @@index([membershipId])
+  @@map("garment_shares")
+}
+
+model Outfit {
+  id              String        @id @default(uuid()) @db.Uuid
+  ownerId         String        @map("owner_id") @db.Uuid
+  name            String        @db.VarChar(100)
+  scene           GarmentScene?
+  notes           String?       @db.VarChar(500)
+  weatherSnapshot Json?         @map("weather_snapshot") @db.JsonB
+  version         Int           @default(1)
+  deletedAt       DateTime?     @map("deleted_at") @db.Timestamptz(3)
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+  owner           Account       @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  items           OutfitItem[]
+
+  @@index([ownerId, deletedAt, updatedAt])
+  @@map("outfits")
+}
+
+model OutfitItem {
+  id        String         @id @default(uuid()) @db.Uuid
+  outfitId  String         @map("outfit_id") @db.Uuid
+  garmentId String         @map("garment_id") @db.Uuid
+  role      OutfitItemRole
+  sortOrder Int            @map("sort_order")
+  outfit    Outfit         @relation(fields: [outfitId], references: [id], onDelete: Restrict)
+  garment   Garment        @relation(fields: [garmentId], references: [id], onDelete: Restrict)
+
+  @@unique([outfitId, garmentId])
+  @@index([garmentId])
+  @@map("outfit_items")
+}
+
+model WardrobeWeatherCache {
+  id           String   @id @default(uuid()) @db.Uuid
+  locationKey  String   @map("location_key") @db.VarChar(120)
+  timezone     String   @db.VarChar(64)
+  forecastFrom DateTime @map("forecast_from") @db.Date
+  forecastTo   DateTime @map("forecast_to") @db.Date
+  data         Json     @db.JsonB
+  fetchedAt    DateTime @map("fetched_at") @db.Timestamptz(3)
+  expiresAt    DateTime @map("expires_at") @db.Timestamptz(3)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@unique([locationKey, forecastFrom, forecastTo])
+  @@index([expiresAt])
+  @@map("wardrobe_weather_cache")
 }

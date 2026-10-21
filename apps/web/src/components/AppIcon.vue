@@ -12,6 +12,12 @@ const paths: Record<string, string[]> = {
   bell: ["M5 17h14l-2-3V9a5 5 0 0 0-10 0v5ZM10 21h4"],
   arrow: ["M4 12h16m-6-6 6 6-6 6"],
   check: ["m5 12 4 4L19 6"],
+  search: ["m20 20-4.5-4.5", "M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z"],
+  wardrobe: [
+    "M4 4h16v17H4Z",
+    "M9 4v17M15 4v17",
+    "M6.5 10h.01M12 10h.01M17.5 10h.01",
+  ],
 };
 </script>
 

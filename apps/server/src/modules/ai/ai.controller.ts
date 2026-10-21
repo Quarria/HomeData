@@ -1,4 +1,5 @@
 import {
+  ConflictException,
   Body,
   Controller,
   Get,
@@ -10,13 +11,19 @@ import {
   Query,
   Req,
 } from "@nestjs/common";
-import { reportQuerySchema } from "@homedata/contracts";
+import {
+  reportQuerySchema,
+  wardrobeRecommendationRequestSchema,
+} from "@homedata/contracts";
 import { z } from "zod";
 import type { AuthenticatedRequest } from "../../shared/auth/auth-types.js";
 import { apiSuccess, parseBody } from "../../shared/http/api-response.js";
 import { AiService } from "./ai.service.js";
 
 const receiptRequestSchema = z.object({ receiptId: z.string().uuid() });
+const wardrobeImageRequestSchema = z.object({
+  wardrobeImageId: z.string().uuid(),
+});
 const idempotencyKeySchema = z.string().uuid();
 
 @Controller("ai")
@@ -55,6 +62,44 @@ export class AiController {
         request.account!.id,
         input.receiptId,
         this.key(key),
+      ),
+    );
+  }
+
+  @Post("wardrobe-recognitions")
+  async recognizeWardrobe(
+    @Body() body: unknown,
+    @Headers("idempotency-key") key: string | undefined,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    const input = parseBody(wardrobeImageRequestSchema, body);
+    return apiSuccess(
+      request,
+      await this.ai.createWardrobeRecognition(
+        request.account!.id,
+        input.wardrobeImageId,
+        this.key(key),
+      ),
+    );
+  }
+
+  @Post("wardrobe-recommendations")
+  async recommendWardrobe(
+    @Body() body: unknown,
+    @Headers("idempotency-key") key: string | undefined,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    const input = parseBody(wardrobeRecommendationRequestSchema, body);
+    const requestKey = this.key(key ?? input.idempotencyKey);
+    if (requestKey !== input.idempotencyKey) {
+      throw new ConflictException({ code: "IDEMPOTENCY_MISMATCH" });
+    }
+    return apiSuccess(
+      request,
+      await this.ai.createWardrobeRecommendation(
+        request.account!.id,
+        input,
+        requestKey,
       ),
     );
   }

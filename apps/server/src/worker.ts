@@ -5,6 +5,7 @@ import { TasksService } from "./modules/tasks/tasks.service.js";
 import { AppLogger } from "./shared/logging/app-logger.js";
 import { AiService } from "./modules/ai/ai.service.js";
 import { SharesService } from "./modules/shares/shares.service.js";
+import { WardrobeService } from "./modules/wardrobe/wardrobe.service.js";
 
 const intervalMs = 60_000;
 const app = await NestFactory.createApplicationContext(AppModule, {
@@ -14,6 +15,7 @@ const logger = app.get(AppLogger);
 const tasks = app.get(TasksService);
 const ai = app.get(AiService);
 const shares = app.get(SharesService);
+const wardrobe = app.get(WardrobeService);
 let stopping = false;
 let running = false;
 let aiRunning = false;
@@ -68,6 +70,22 @@ const shareCleanupTimer = setInterval(
   () => void cleanupShares(),
   shareCleanupIntervalMs,
 );
+const wardrobeCleanupIntervalMs = 6 * 60 * 60 * 1000;
+async function cleanupWardrobeImages() {
+  try {
+    const result = await wardrobe.cleanupTemporaryImages();
+    if (result.purged) logger.log("Temporary wardrobe images purged", result);
+  } catch (error) {
+    logger.error("Wardrobe image cleanup failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+await cleanupWardrobeImages();
+const wardrobeCleanupTimer = setInterval(
+  () => void cleanupWardrobeImages(),
+  wardrobeCleanupIntervalMs,
+);
 
 async function stop() {
   if (stopping) return;
@@ -75,6 +93,7 @@ async function stop() {
   clearInterval(timer);
   clearInterval(aiTimer);
   clearInterval(shareCleanupTimer);
+  clearInterval(wardrobeCleanupTimer);
   await app.close();
 }
 

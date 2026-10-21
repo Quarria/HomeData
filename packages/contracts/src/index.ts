@@ -82,6 +82,27 @@ export const familyVersionRequestSchema = z.object({
   version: z.number().int().positive(),
 });
 
+export const familyDefaultCityRequestSchema = z.object({
+  version: z.number().int().positive(),
+  city: z
+    .object({
+      name: z.string().trim().min(1).max(120),
+      countryCode: z.string().regex(/^[A-Z]{2}$/),
+      latitude: z.number().min(-90).max(90),
+      longitude: z.number().min(-180).max(180),
+      timezone: z.string().trim().min(1).max(64),
+    })
+    .nullable(),
+});
+
+export const wardrobeCitySchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  countryCode: z.string().regex(/^[A-Z]{2}$/),
+  latitude: z.number().min(-90).max(90),
+  longitude: z.number().min(-180).max(180),
+  timezone: z.string().trim().min(1).max(64),
+});
+
 const isoDateSchema = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/)
@@ -92,6 +113,11 @@ const isoDateSchema = z
       parsed.toISOString().slice(0, 10) === value
     );
   }, "日期无效");
+export const wardrobeWeatherRequestSchema = z.object({
+  city: wardrobeCitySchema,
+  startDate: isoDateSchema,
+  days: z.number().int().min(1).max(30),
+});
 const amountSchema = z
   .string()
   .regex(/^(?:0|[1-9]\d{0,8})(?:\.\d{1,2})?$/)
@@ -359,6 +385,206 @@ export type FamilySummary = {
   adminAccountId: string;
   status: "ACTIVE" | "ARCHIVED";
   version: number;
+  defaultCity: {
+    name: string;
+    countryCode: string;
+    latitude: number;
+    longitude: number;
+    timezone: string;
+  } | null;
   role: "ADMIN" | "MEMBER";
   members: Array<Pick<AccountSummary, "id" | "username" | "nickname">>;
 };
+
+export const garmentSeasons = ["SPRING", "SUMMER", "AUTUMN", "WINTER"] as const;
+export const garmentLayers = ["INNER", "MID", "OUTER"] as const;
+export const garmentCategories = [
+  "TOP",
+  "OUTERWEAR",
+  "BOTTOM",
+  "ONE_PIECE",
+  "SHOES",
+  "ACCESSORY",
+] as const;
+export const garmentStatuses = [
+  "WEARABLE",
+  "LAUNDERING",
+  "STORED",
+  "RETIRED",
+] as const;
+export const garmentScenes = ["COMMUTE", "CASUAL", "SPORT"] as const;
+
+export const wardrobeDailyRecommendationRequestSchema = z.object({
+  scene: z.enum(garmentScenes),
+  city: wardrobeCitySchema.optional(),
+  weatherCondition: z.enum(["COLD", "MILD", "WARM", "RAINY"]).optional(),
+  idea: z.string().trim().max(160).optional(),
+});
+
+const garmentFieldsSchema = z.object({
+  name: z.string().trim().min(1).max(100),
+  category: z.enum(garmentCategories),
+  ownerId: z.string().uuid(),
+  recipientFamilyId: z.string().uuid().optional(),
+  mainImageId: z.string().uuid(),
+  color: z.string().trim().max(40).nullable().optional(),
+  stylingAdvice: z.string().trim().max(80).nullable().optional(),
+  seasons: z.array(z.enum(garmentSeasons)).max(4),
+  layers: z.array(z.enum(garmentLayers)).max(3),
+  scenes: z.array(z.enum(garmentScenes)).max(3),
+  status: z.enum(garmentStatuses).default("WEARABLE"),
+  storageLocation: z.string().trim().max(100).nullable().optional(),
+  notes: z.string().trim().max(500).nullable().optional(),
+  acquiredOn: isoDateSchema.nullable().optional(),
+});
+
+export const garmentCreateRequestSchema = z
+  .discriminatedUnion("expenseMode", [
+    garmentFieldsSchema.extend({ expenseMode: z.literal("NONE") }).strict(),
+    garmentFieldsSchema
+      .extend({
+        expenseMode: z.literal("EXISTING"),
+        expenseId: z.string().uuid(),
+      })
+      .strict(),
+    garmentFieldsSchema
+      .extend({
+        expenseMode: z.literal("NEW"),
+        expense: expenseCreateRequestSchema.safeExtend({
+          receiptId: z.string().uuid().optional(),
+          confirmReceiptFamilyVisible: z.boolean().optional(),
+        }),
+      })
+      .strict(),
+  ])
+  .superRefine((value, context) => {
+    const seasons = value.seasons;
+    if (new Set(seasons).size !== seasons.length) {
+      context.addIssue({
+        code: "custom",
+        path: ["seasons"],
+        message: "季节不能重复",
+      });
+    }
+    if (new Set(value.layers).size !== value.layers.length) {
+      context.addIssue({
+        code: "custom",
+        path: ["layers"],
+        message: "适用层次不能重复",
+      });
+    }
+    if (new Set(value.scenes).size !== value.scenes.length) {
+      context.addIssue({
+        code: "custom",
+        path: ["scenes"],
+        message: "适用场景不能重复",
+      });
+    }
+  });
+
+export const garmentPatchRequestSchema = garmentFieldsSchema
+  .omit({ ownerId: true, recipientFamilyId: true })
+  .partial()
+  .extend({ version: z.number().int().positive() })
+  .superRefine((value, context) => {
+    for (const key of ["seasons", "layers", "scenes"] as const) {
+      const entries = value[key];
+      if (entries && new Set(entries).size !== entries.length) {
+        context.addIssue({
+          code: "custom",
+          path: [key],
+          message: "选项不能重复",
+        });
+      }
+    }
+  });
+
+export const garmentListQuerySchema = z.object({
+  space: z.enum(["personal", "family"]).default("personal"),
+  familyId: z.string().uuid().optional(),
+  q: z.string().trim().max(100).optional(),
+  ownerId: z.string().uuid().optional(),
+  category: z.enum(garmentCategories).optional(),
+  color: z.string().trim().max(40).optional(),
+  status: z.enum(garmentStatuses).optional(),
+  season: z.enum(garmentSeasons).optional(),
+  cursor: z.string().uuid().optional(),
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+});
+
+const outfitItemSchema = z.object({
+  garmentId: z.string().uuid(),
+  role: z.enum([
+    "TOP",
+    "MID",
+    "OUTER",
+    "BOTTOM",
+    "ONE_PIECE",
+    "SHOES",
+    "ACCESSORY",
+  ]),
+  sortOrder: z.number().int().min(0).max(20),
+});
+
+export const outfitCreateRequestSchema = z
+  .object({
+    name: z.string().trim().min(1).max(100),
+    scene: z.enum(garmentScenes).nullable().optional(),
+    notes: z.string().trim().max(500).nullable().optional(),
+    items: z.array(outfitItemSchema).min(1).max(8),
+  })
+  .superRefine((value, context) => {
+    const ids = value.items.map(({ garmentId }) => garmentId);
+    if (new Set(ids).size !== ids.length) {
+      context.addIssue({
+        code: "custom",
+        path: ["items"],
+        message: "单品不能重复",
+      });
+    }
+  });
+
+export const outfitPatchRequestSchema = z
+  .object({
+    version: z.number().int().positive(),
+    name: z.string().trim().min(1).max(100).optional(),
+    scene: z.enum(garmentScenes).nullable().optional(),
+    notes: z.string().trim().max(500).nullable().optional(),
+    items: z.array(outfitItemSchema).min(1).max(8).optional(),
+  })
+  .superRefine((value, context) => {
+    if (value.items) {
+      const ids = value.items.map(({ garmentId }) => garmentId);
+      if (new Set(ids).size !== ids.length) {
+        context.addIssue({
+          code: "custom",
+          path: ["items"],
+          message: "单品不能重复",
+        });
+      }
+    }
+  });
+
+export const wardrobeRecommendationRequestSchema = z
+  .object({
+    mode: z.enum(["DAILY", "TRIP"]),
+    scene: z.enum(garmentScenes),
+    city: wardrobeCitySchema.optional(),
+    startOn: isoDateSchema.optional(),
+    days: z.number().int().min(1).max(30).optional(),
+    weatherCondition: z.enum(["COLD", "MILD", "WARM", "RAINY"]).optional(),
+    idea: z.string().trim().max(160).optional(),
+    idempotencyKey: z.string().uuid(),
+  })
+  .superRefine((value, context) => {
+    if (
+      value.mode === "TRIP" &&
+      (!value.city || !value.startOn || !value.days)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["days"],
+        message: "旅行推荐需要目的地、出发日期和天数",
+      });
+    }
+  });

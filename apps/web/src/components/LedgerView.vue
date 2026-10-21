@@ -61,7 +61,33 @@ type ReceiptDraft = {
   thingsToVerify: string[];
 };
 
-const props = defineProps<{ initialAction?: string; initialReceipt?: File }>();
+type ExpenseDraft = {
+  title: string;
+  categoryId: string;
+  occurredOn: string;
+  amount: string;
+  quantity?: string;
+  unit?: string;
+  unitPrice?: string;
+  note?: string;
+  familyId?: string;
+  receiptId?: string;
+};
+const props = defineProps<{
+  initialAction?: string;
+  initialReceipt?: File;
+  resumeExpenseDraft?: ExpenseDraft;
+}>();
+const emit = defineEmits<{
+  navigate: [
+    target: {
+      page: "wardrobe";
+      action: string;
+      id: string;
+      expenseDraft?: ExpenseDraft;
+    },
+  ];
+}>();
 const session = useSessionStore();
 const spaceOptions = computed(() =>
   session.family
@@ -203,6 +229,12 @@ watch(categories, (nextCategories) => {
 onMounted(() => {
   void load();
   if (props.initialAction === "create") openCreate();
+  if (props.resumeExpenseDraft) {
+    openCreate();
+    Object.assign(form, props.resumeExpenseDraft);
+    includeFamily.value = Boolean(props.resumeExpenseDraft.familyId);
+    pendingReceiptId.value = props.resumeExpenseDraft.receiptId ?? "";
+  }
   if (props.initialReceipt) void recognizeReceipt(props.initialReceipt);
 });
 
@@ -223,6 +255,44 @@ function openCreate() {
   createIdempotencyKey.value = newIdempotencyKey();
   formMode.value = "create";
   error.value = "";
+}
+
+function openWardrobeFromExpenseDraft(
+  item?: NonNullable<typeof receiptDraft.value>["items"][number],
+) {
+  const draft: ExpenseDraft = {
+    title: item?.title ?? form.title,
+    categoryId:
+      item?.categoryId ?? form.categoryId ?? categories.value[0]?.id ?? "",
+    occurredOn: item
+      ? (receiptDraft.value?.occurredOn ?? today())
+      : form.occurredOn,
+    amount: item?.amount ?? form.amount,
+    ...((item?.quantity ?? form.quantity)
+      ? { quantity: item?.quantity ?? form.quantity }
+      : {}),
+    ...((item?.unit ?? form.unit) ? { unit: item?.unit ?? form.unit } : {}),
+    ...((item?.unitPrice ?? form.unitPrice)
+      ? { unitPrice: item?.unitPrice ?? form.unitPrice }
+      : {}),
+    ...(item?.title ? {} : form.note ? { note: form.note } : {}),
+    ...(includeFamily.value && session.family
+      ? { familyId: session.family.id }
+      : {}),
+    ...((item ? receiptDraft.value?.receiptId : pendingReceiptId.value)
+      ? {
+          receiptId: item
+            ? receiptDraft.value!.receiptId
+            : pendingReceiptId.value,
+        }
+      : {}),
+  };
+  emit("navigate", {
+    page: "wardrobe",
+    action: "create-from-expense-draft",
+    id: "",
+    expenseDraft: draft,
+  });
 }
 
 function openEdit(item: Expense) {
@@ -585,6 +655,12 @@ function displayDate(value: string) {
           <button class="quiet-button" @click="useReceiptDraft(item)">
             核对并记账
           </button>
+          <button
+            class="quiet-button"
+            @click="openWardrobeFromExpenseDraft(item)"
+          >
+            作为衣物录入
+          </button>
         </article>
       </div>
     </section>
@@ -825,6 +901,19 @@ function displayDate(value: string) {
                 {{ uploading ? "正在上传…" : "添加票据" }}
               </button>
               <button
+                v-if="selected.capabilities.canEdit"
+                class="quiet-button"
+                @click="
+                  emit('navigate', {
+                    page: 'wardrobe',
+                    action: 'add-existing-expense',
+                    id: selected.id,
+                  })
+                "
+              >
+                添加衣物
+              </button>
+              <button
                 v-if="selected.capabilities.canDelete"
                 class="danger-button"
                 @click="removeExpense(selected)"
@@ -978,6 +1067,14 @@ function displayDate(value: string) {
           <footer class="ledger-dialog-actions">
             <button type="button" class="quiet-button" @click="closeForm">
               取消</button
+            ><button
+              v-if="formMode === 'create'"
+              type="button"
+              class="quiet-button"
+              :disabled="saving"
+              @click="openWardrobeFromExpenseDraft()"
+            >
+              同时录入衣物</button
             ><button
               class="primary-button"
               :disabled="

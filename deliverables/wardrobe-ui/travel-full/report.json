@@ -1,0 +1,38 @@
+[
+  {
+    "file": "trip-result-1440x900.png",
+    "state": "trip-result",
+    "size": "1440x900",
+    "zoom": 1,
+    "animationWaitMs": 0,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "trip-partial-1440x900.png",
+    "state": "trip-partial",
+    "size": "1440x900",
+    "zoom": 1,
+    "animationWaitMs": 0,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "trip-result-390x844.png",
+    "state": "trip-result",
+    "size": "390x844",
+    "zoom": 1,
+    "animationWaitMs": 0,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "trip-partial-390x844.png",
+    "state": "trip-partial",
+    "size": "390x844",
+    "zoom": 1,
+    "animationWaitMs": 0,
+    "issues": [],
+    "lint": []
+  }
+]
