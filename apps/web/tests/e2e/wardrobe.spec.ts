@@ -1,7 +1,8 @@
 import { expect, test } from "@playwright/test";
+import { garmentCreateRequestSchema } from "@homedata/contracts";
 
 const account = {
-  id: "wardrobe-e2e-account",
+  id: "00000000-0000-4000-8000-000000000001",
   username: "demo",
   nickname: "演示用户",
   systemRole: "USER",
@@ -9,6 +10,8 @@ const account = {
   mustChangePassword: false,
   version: 1,
 };
+const recognitionImageId = "00000000-0000-4000-8000-000000000002";
+const recognitionRunId = "00000000-0000-4000-8000-000000000003";
 const imageBytes = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAEklEQVQImWPY3dGxu6ODAUIBADMOBy3W07hNAAAAAElFTkSuQmCC",
   "base64",
@@ -101,6 +104,8 @@ test("shows recognition progress and prevents duplicate AI requests", async ({
   page,
 }) => {
   let recognitionRequests = 0;
+  let saved: Record<string, unknown> | null = null;
+  let validationIssues: unknown;
   await page.route("**/api/v1/**", async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -116,15 +121,54 @@ test("shows recognition progress and prevents duplicate AI requests", async ({
       return ok({ net: "0.00", hasData: false });
     if (endpoint === "/tasks" || endpoint === "/recurring-rules")
       return ok({ items: [], nextCursor: null });
-    if (endpoint === "/wardrobe/garments")
-      return ok({ items: [], nextCursor: null });
+    if (endpoint === "/wardrobe/garments" && request.method() === "GET")
+      return ok({ items: saved ? [saved] : [], nextCursor: null });
+    if (endpoint === "/wardrobe/garments" && request.method() === "POST") {
+      const parsed = garmentCreateRequestSchema.safeParse(
+        request.postDataJSON(),
+      );
+      if (!parsed.success) {
+        validationIssues = parsed.error.issues;
+        return route.fulfill({
+          status: 422,
+          json: {
+            error: {
+              code: "REQUEST_VALIDATION_FAILED",
+              message: "REQUEST_VALIDATION_FAILED",
+              fields: Object.fromEntries(
+                parsed.error.issues.map((issue) => [
+                  issue.path.join("."),
+                  issue.message,
+                ]),
+              ),
+            },
+            meta: { requestId: null },
+          },
+        });
+      }
+      saved = {
+        ...parsed.data,
+        id: "wardrobe-recognition-garment",
+        ownerId: account.id,
+        createdById: account.id,
+        familyId: null,
+        version: 1,
+        mainImage: {
+          id: "wardrobe-recognition-image",
+          mimeType: "image/webp",
+          contentUrl:
+            "/api/v1/wardrobe/images/wardrobe-recognition-image/content",
+          thumbnailUrl:
+            "/api/v1/wardrobe/images/wardrobe-recognition-image/content?size=thumbnail",
+        },
+      };
+      return ok(saved);
+    }
     if (endpoint === "/wardrobe/images" && request.method() === "POST")
       return ok({
-        id: "wardrobe-recognition-image",
-        contentUrl:
-          "/api/v1/wardrobe/images/wardrobe-recognition-image/content",
-        thumbnailUrl:
-          "/api/v1/wardrobe/images/wardrobe-recognition-image/content?size=thumbnail",
+        id: recognitionImageId,
+        contentUrl: `/api/v1/wardrobe/images/${recognitionImageId}/content`,
+        thumbnailUrl: `/api/v1/wardrobe/images/${recognitionImageId}/content?size=thumbnail`,
       });
     if (
       endpoint === "/ai/wardrobe-recognitions" &&
@@ -132,9 +176,9 @@ test("shows recognition progress and prevents duplicate AI requests", async ({
     ) {
       recognitionRequests += 1;
       await new Promise((resolve) => setTimeout(resolve, 600));
-      return ok({ id: "wardrobe-recognition-run", status: "PENDING" });
+      return ok({ id: recognitionRunId, status: "PENDING" });
     }
-    if (endpoint === "/ai/runs/wardrobe-recognition-run")
+    if (endpoint === `/ai/runs/${recognitionRunId}`)
       return ok({
         status: "SUCCEEDED",
         errorCode: null,
@@ -181,4 +225,7 @@ test("shows recognition progress and prevents duplicate AI requests", async ({
     { timeout: 5000 },
   );
   await expect(page.getByLabel("衣物名称")).toHaveValue("米色针织衫");
+  await page.getByRole("button", { name: "保存衣物" }).click();
+  expect(validationIssues, JSON.stringify(validationIssues)).toBeUndefined();
+  await expect(page.getByRole("heading", { name: "米色针织衫" })).toBeVisible();
 });

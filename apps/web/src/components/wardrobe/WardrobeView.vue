@@ -648,9 +648,14 @@ async function save() {
   saving.value = true;
   error.value = "";
   const payload = {
-    ...form.value,
+    name: form.value.name,
+    category: form.value.category,
     color: form.value.color || null,
     stylingAdvice: form.value.stylingAdvice || null,
+    seasons: [...form.value.seasons],
+    layers: [...form.value.layers],
+    scenes: [...form.value.scenes],
+    status: form.value.status,
     storageLocation: form.value.storageLocation || null,
     notes: form.value.notes || null,
     acquiredOn: form.value.acquiredOn || null,
