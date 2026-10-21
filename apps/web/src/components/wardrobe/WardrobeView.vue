@@ -1874,14 +1874,21 @@ onBeforeUnmount(() => {
               type="button"
               class="wardrobe-quiet"
               :disabled="recognizing || saving"
+              :aria-busy="recognizing"
               @click="recognizeImage"
             >
+              <span
+                v-if="recognizing"
+                class="wardrobe-recognition-spinner"
+                aria-hidden="true"
+              />
               {{ recognizing ? "正在识别…" : "AI 识别并填入草稿" }}
             </button>
             <p
               v-if="recognitionMessage"
               class="wardrobe-expense-note"
               role="status"
+              aria-live="polite"
             >
               {{ recognitionMessage }}
             </p>
@@ -2782,6 +2789,28 @@ onBeforeUnmount(() => {
   background: transparent;
   color: var(--ink);
   border-color: var(--line);
+}
+.wardrobe-quiet:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+.wardrobe-recognition-spinner {
+  width: 15px;
+  height: 15px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: wardrobe-recognition-spin 0.7s linear infinite;
+}
+@keyframes wardrobe-recognition-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wardrobe-recognition-spinner {
+    animation-duration: 1.6s;
+  }
 }
 .wardrobe-danger {
   background: #fff6f5;
