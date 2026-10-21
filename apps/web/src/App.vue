@@ -31,10 +31,11 @@ const pages = [
   { id: "ledger", title: "账本" },
   { id: "tasks", title: "待办与提醒" },
   { id: "reports", title: "报表" },
+  { id: "wardrobe", title: "智能衣柜" },
   { id: "profile", title: "我的" },
 ] as const;
-const desktopPages = [...pages, { id: "wardrobe", title: "智能衣柜" }] as const;
-const activePage = ref<(typeof desktopPages)[number]["id"]>("home");
+const desktopPages = pages;
+const activePage = ref<(typeof pages)[number]["id"]>("home");
 const activeTitle = computed(
   () => desktopPages.find(({ id }) => id === activePage.value)?.title ?? "首页",
 );

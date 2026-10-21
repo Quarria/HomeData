@@ -1453,7 +1453,7 @@ textarea:focus {
   .mobile-nav {
     height: calc(76px + env(safe-area-inset-bottom));
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     align-items: start;
     padding: 6px 0 env(safe-area-inset-bottom);
     background: #faf6f2;
@@ -1487,11 +1487,11 @@ textarea:focus {
     position: absolute;
     top: 7px;
     left: 6px;
-    width: calc(20% - 12px);
+    width: calc(16.6667% - 10px);
     height: 32px;
     border-radius: 18px;
     background: #eadce0;
-    transform: translateX(calc(var(--active-index) * (100% + 12px)));
+    transform: translateX(calc(var(--active-index) * (100% + 10px)));
     transition: transform 220ms var(--ease-out);
   }
   .page-footer {

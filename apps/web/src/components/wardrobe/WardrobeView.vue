@@ -5,7 +5,7 @@ import {
   apiRequest,
   newIdempotencyKey,
 } from "../../api/client";
-import { useSessionStore } from "../../stores/session";
+import { useSessionStore, type FamilySummary } from "../../stores/session";
 import AppIcon from "../AppIcon.vue";
 import { compressWardrobeImage } from "./compress-image";
 
@@ -47,6 +47,8 @@ type ExpenseDetails = {
   occurredOn: string;
   familyId: string | null;
   category: ExpenseCategory;
+  payer?: { id: string; nickname: string };
+  capabilities?: { canEdit: boolean };
 };
 type City = {
   name: string;
@@ -155,6 +157,9 @@ const imageInput = ref<HTMLInputElement | null>(null);
 const imagePreview = ref("");
 const uploadedImage = ref<ImageUpload | null>(null);
 const expenseCategories = ref<ExpenseCategory[]>([]);
+const expenseOptions = ref<ExpenseDetails[]>([]);
+const expenseOptionsLoading = ref(false);
+const expenseSearch = ref("");
 const aiEnabled = ref(false);
 const recognizing = ref(false);
 const recognitionMessage = ref("");
@@ -162,6 +167,7 @@ const cityQuery = ref("");
 const cityResults = ref<City[]>([]);
 const citySearching = ref(false);
 const citySaving = ref(false);
+const citySaveMessage = ref("");
 const weatherLoading = ref(false);
 const weatherError = ref("");
 const activeTab = ref<"closet" | "daily" | "trip" | "saved">("closet");
@@ -258,8 +264,10 @@ const editableRows = computed(() =>
   ),
 );
 let requestSerial = 0;
+let expenseOptionRequestSerial = 0;
 let createKey = "";
 let wardrobeMounted = true;
+let expenseDebounce = 0;
 
 function message(reason: unknown, fallback: string) {
   return reason instanceof ApiClientError ? reason.message : fallback;
@@ -334,12 +342,49 @@ async function openFromExpense(expenseId: string) {
   try {
     const expense = await apiRequest<ExpenseDetails>(`/expenses/${expenseId}`);
     selectedExpense.value = expense;
+    if (!expenseOptions.value.some((item) => item.id === expense.id))
+      expenseOptions.value = [expense, ...expenseOptions.value];
     initialExpenseId.value = expense.id;
     form.value.expenseMode = "EXISTING";
     form.value.ownerId = session.account?.id ?? "";
   } catch (reason) {
     error.value = message(reason, "无法读取这笔账单，请确认仍有编辑权限。");
   }
+}
+async function loadExpenseOptions() {
+  const serial = ++expenseOptionRequestSerial;
+  expenseOptionsLoading.value = true;
+  try {
+    const params = new URLSearchParams({
+      space: "personal",
+      origin: "all",
+      limit: "100",
+      deleted: "false",
+    });
+    if (expenseSearch.value.trim()) params.set("q", expenseSearch.value.trim());
+    const result = await apiRequest<{ items: ExpenseDetails[] }>(
+      `/expenses?${params}`,
+    );
+    const items = result.items.filter(
+      (expense) => expense.capabilities?.canEdit !== false,
+    );
+    if (
+      selectedExpense.value &&
+      !items.some((expense) => expense.id === selectedExpense.value?.id)
+    ) {
+      items.unshift(selectedExpense.value);
+    }
+    if (serial === expenseOptionRequestSerial) expenseOptions.value = items;
+  } catch {
+    if (serial === expenseOptionRequestSerial) expenseOptions.value = [];
+  } finally {
+    if (serial === expenseOptionRequestSerial)
+      expenseOptionsLoading.value = false;
+  }
+}
+function selectExpense(expenseId: string) {
+  selectedExpense.value =
+    expenseOptions.value.find((expense) => expense.id === expenseId) ?? null;
 }
 async function discardTemporaryImage() {
   const imageId = uploadedImage.value?.id;
@@ -561,6 +606,10 @@ async function save() {
       return;
     }
   }
+  if (form.value.expenseMode === "EXISTING" && !selectedExpense.value) {
+    error.value = "请选择一笔已有账单，或改为暂不关联。";
+    return;
+  }
   if (!selected.value && !uploadedImage.value) {
     error.value = "请先添加一张衣物照片。";
     return;
@@ -726,17 +775,43 @@ async function searchCity() {
   }
 }
 async function saveDefaultCity(city: City) {
-  if (!session.family) return;
+  const family = session.family;
+  if (!family || citySaving.value) return;
   citySaving.value = true;
   weatherError.value = "";
+  citySaveMessage.value = "";
   try {
-    await apiRequest(`/families/${session.family.id}/default-city`, {
-      method: "PATCH",
-      body: JSON.stringify({ version: session.family.version, city }),
-    });
+    let updatedFamily: FamilySummary;
+    try {
+      updatedFamily = await apiRequest<FamilySummary>(
+        `/families/${family.id}/default-city`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({ version: family.version, city }),
+        },
+      );
+    } catch (reason) {
+      if (
+        !(reason instanceof ApiClientError) ||
+        reason.code !== "VERSION_CONFLICT"
+      )
+        throw reason;
+      const latestFamily = await apiRequest<FamilySummary | null>(
+        "/families/current",
+      );
+      if (!latestFamily || latestFamily.id !== family.id) throw reason;
+      updatedFamily = await apiRequest<FamilySummary>(
+        `/families/${latestFamily.id}/default-city`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({ version: latestFamily.version, city }),
+        },
+      );
+    }
+    session.family = updatedFamily;
     cityResults.value = [];
     cityQuery.value = "";
-    await session.refresh();
+    citySaveMessage.value = `家庭默认城市已设置为${updatedFamily.defaultCity?.name ?? city.name}`;
   } catch (reason) {
     weatherError.value = message(reason, "保存默认城市失败，请重试。");
   } finally {
@@ -1152,6 +1227,7 @@ watch(
 );
 onMounted(async () => {
   wardrobeMounted = true;
+  void loadExpenseOptions();
   try {
     expenseCategories.value =
       await apiRequest<ExpenseCategory[]>("/categories");
@@ -1179,6 +1255,7 @@ watch(
     session.family?.defaultCity?.timezone,
   ],
   () => void loadTodayWeather(),
+  { immediate: true },
 );
 watch([outfitIdea, outfitScene, weatherConditionChoice], () => {
   recommendations.value = [];
@@ -1198,10 +1275,15 @@ watch(cityQuery, () => {
   window.clearTimeout(citySearchTimer);
   citySearchTimer = window.setTimeout(() => void searchCity(), 280);
 });
+watch(expenseSearch, () => {
+  window.clearTimeout(expenseDebounce);
+  expenseDebounce = window.setTimeout(() => void loadExpenseOptions(), 220);
+});
 onBeforeUnmount(() => {
   wardrobeMounted = false;
   window.clearTimeout(debounce);
   window.clearTimeout(citySearchTimer);
+  window.clearTimeout(expenseDebounce);
   void discardTemporaryImage();
 });
 </script>
@@ -1277,6 +1359,9 @@ onBeforeUnmount(() => {
         <span v-if="citySearching" class="wardrobe-weather-muted"
           >正在搜索…</span
         >
+        <span v-if="citySaving" class="wardrobe-weather-muted" role="status"
+          >正在保存家庭默认城市…</span
+        >
         <button
           v-for="city in cityResults"
           :key="`${city.latitude}-${city.longitude}-${city.timezone}`"
@@ -1289,6 +1374,13 @@ onBeforeUnmount(() => {
         </button>
         <p v-if="weatherError" class="wardrobe-weather-error" role="alert">
           {{ weatherError }}
+        </p>
+        <p
+          v-if="citySaveMessage"
+          class="wardrobe-weather-success"
+          role="status"
+        >
+          {{ citySaveMessage }}
         </p>
       </div>
       <button
@@ -1855,12 +1947,12 @@ onBeforeUnmount(() => {
                     type="radio"
                     value="NEW"
                   />新建账单</label
-                ><label v-if="selectedExpense" class="wardrobe-check"
+                ><label class="wardrobe-check"
                   ><input
                     v-model="form.expenseMode"
                     type="radio"
                     value="EXISTING"
-                  />关联当前账单</label
+                  />关联已有账单</label
                 >
               </div>
               <p
@@ -1870,6 +1962,46 @@ onBeforeUnmount(() => {
                 {{ selectedExpense.title }} · ¥{{ selectedExpense.amount }} ·
                 {{ selectedExpense.occurredOn }}，此账单不会重复创建。
               </p>
+              <label
+                v-if="form.expenseMode === 'EXISTING'"
+                class="wardrobe-expense-select"
+                >搜索已有账单<input
+                  v-model="expenseSearch"
+                  type="search"
+                  maxlength="120"
+                  placeholder="按账单名称或备注搜索"
+              /></label>
+              <label
+                v-if="form.expenseMode === 'EXISTING'"
+                class="wardrobe-expense-select"
+                >选择已有账单<select
+                  :value="selectedExpense?.id ?? ''"
+                  :disabled="expenseOptionsLoading"
+                  @change="
+                    selectExpense(($event.target as HTMLSelectElement).value)
+                  "
+                >
+                  <option value="" disabled>
+                    {{
+                      expenseOptionsLoading
+                        ? "正在加载账单…"
+                        : expenseOptions.length
+                          ? "请选择账单"
+                          : "暂无可关联的账单"
+                    }}
+                  </option>
+                  <option
+                    v-for="expense in expenseOptions"
+                    :key="expense.id"
+                    :value="expense.id"
+                  >
+                    {{ expense.occurredOn }} · {{ expense.title }} · ¥{{
+                      expense.amount
+                    }}
+                    · {{ expense.category.name }}
+                  </option>
+                </select></label
+              >
               <div
                 v-if="form.expenseMode === 'NEW'"
                 class="wardrobe-fields wardrobe-expense-fields"
@@ -2393,6 +2525,9 @@ onBeforeUnmount(() => {
   font-size: 12px;
 }
 .wardrobe-expense-extra-grid input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   border: 1px solid var(--line);
   min-height: 38px;
   padding: 7px 9px;
@@ -2462,6 +2597,11 @@ onBeforeUnmount(() => {
 .wardrobe-weather-error {
   margin: 2px 0;
   color: #8b3434;
+  font-size: 12px;
+}
+.wardrobe-weather-success {
+  margin: 2px 0;
+  color: #426a4b;
   font-size: 12px;
 }
 .wardrobe-weather-attribution {
@@ -2786,7 +2926,31 @@ onBeforeUnmount(() => {
   background: #fff;
 }
 .wardrobe-check input {
+  width: 16px;
+  min-width: 16px;
+  min-height: 16px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  flex: 0 0 auto;
   margin: 0;
+}
+.wardrobe-expense-select {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.wardrobe-expense-select input,
+.wardrobe-expense-select select {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  border: 1px solid var(--line);
+  background: #fff;
+  padding: 10px 12px;
+  min-height: 42px;
+  color: var(--ink);
 }
 .wardrobe-wide {
   grid-column: 1/-1;
@@ -2984,6 +3148,9 @@ onBeforeUnmount(() => {
   .wardrobe-fields {
     grid-template-columns: 1fr;
     gap: 13px;
+  }
+  .wardrobe-expense-extra-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .wardrobe-wide {
     grid-column: auto;
