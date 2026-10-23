@@ -63,7 +63,7 @@ const task = {
   canComplete: true,
 };
 const evidenceRoot = path.resolve(
-  "../../deliverables/life-calendar/app-evidence",
+  "../../deliverables/paper-notebook/app-evidence",
 );
 
 async function setup(page: Page) {
@@ -284,7 +284,7 @@ test("five pages, mobile icons and reduced motion retain the selected design", a
   await page.goto("/");
   await expect(page.locator(".life-amount")).toContainText("3,487.90");
   await expect(page.locator(".life-task")).toHaveCount(2);
-  await expect(navigation(page).locator("button .ui-icon")).toHaveCount(5);
+  await expect(navigation(page).locator("button .ui-icon")).toHaveCount(6);
   await capture(page, "home");
   for (const [label, selector, file] of [
     ["账本", ".ledger-row", "ledger"],

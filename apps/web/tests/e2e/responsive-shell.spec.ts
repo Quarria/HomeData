@@ -1,4 +1,6 @@
 import { expect, test } from "@playwright/test";
+import { mkdir } from "node:fs/promises";
+import path from "node:path";
 
 test("shows the approved personal-first navigation on desktop and mobile", async ({
   page,
@@ -66,6 +68,14 @@ test("shows login when there is no active session", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "欢迎回来" })).toBeVisible();
   await expect(page.getByRole("button", { name: /登录/ })).toBeVisible();
+  const evidence = path.resolve(
+    "../../deliverables/paper-notebook/app-evidence",
+  );
+  await mkdir(evidence, { recursive: true });
+  await page.screenshot({
+    path: path.join(evidence, `${page.viewportSize()!.width}-login.png`),
+    fullPage: true,
+  });
 });
 
 test("keeps reminder preference fields aligned at the available width", async ({

@@ -1,4 +1,6 @@
 import { expect, test } from "@playwright/test";
+import { mkdir } from "node:fs/promises";
+import path from "node:path";
 import { garmentCreateRequestSchema } from "@homedata/contracts";
 
 const account = {
@@ -27,6 +29,15 @@ test("opens the closet from home and saves a manually entered garment", async ({
     const endpoint = url.pathname.replace("/api/v1", "");
     const ok = (data: unknown) =>
       route.fulfill({ status: 200, json: { data } });
+    if (
+      endpoint.startsWith("/wardrobe/images/") &&
+      endpoint.endsWith("/content")
+    )
+      return route.fulfill({
+        status: 200,
+        contentType: "image/png",
+        body: imageBytes,
+      });
     if (endpoint === "/me")
       return ok({ account, family: null, mustChangePassword: false });
     if (endpoint === "/auth/csrf") return ok({ token: "wardrobe-csrf" });
@@ -98,6 +109,25 @@ test("opens the closet from home and saves a manually entered garment", async ({
   await expect(page.getByText("更换照片")).toBeVisible();
   await page.getByRole("button", { name: "保存衣物" }).click();
   await expect(page.getByRole("heading", { name: "春秋针织衫" })).toBeVisible();
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  const evidence = path.resolve(
+    "../../deliverables/paper-notebook/app-evidence",
+  );
+  await mkdir(evidence, { recursive: true });
+  await expect(page.locator(".wardrobe-detail img").first()).toBeVisible();
+  await expect
+    .poll(() =>
+      page
+        .locator(".wardrobe-detail img")
+        .first()
+        .evaluate((image) => (image as HTMLImageElement).naturalWidth),
+    )
+    .toBeGreaterThan(0);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({
+    path: path.join(evidence, `${page.viewportSize()!.width}-wardrobe.png`),
+    fullPage: true,
+  });
 });
 
 test("shows recognition progress and prevents duplicate AI requests", async ({
@@ -112,6 +142,15 @@ test("shows recognition progress and prevents duplicate AI requests", async ({
     const endpoint = url.pathname.replace("/api/v1", "");
     const ok = (data: unknown) =>
       route.fulfill({ status: 200, json: { data } });
+    if (
+      endpoint.startsWith("/wardrobe/images/") &&
+      endpoint.endsWith("/content")
+    )
+      return route.fulfill({
+        status: 200,
+        contentType: "image/png",
+        body: imageBytes,
+      });
     if (endpoint === "/me")
       return ok({ account, family: null, mustChangePassword: false });
     if (endpoint === "/auth/csrf") return ok({ token: "wardrobe-csrf" });

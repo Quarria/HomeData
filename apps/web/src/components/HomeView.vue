@@ -193,6 +193,7 @@ function chooseReceipt(event: Event) {
   <section class="life-home" aria-label="首页概览">
     <div class="life-intro">
       <div>
+        <span class="eyebrow">MY DAILY NOTES</span>
         <h1>
           {{ session.activeSpace === "family" ? "家庭日常" : "个人日常" }}
         </h1>
@@ -210,6 +211,75 @@ function chooseReceipt(event: Event) {
       :aria-busy="loading"
       @animationend="finishEntry"
     >
+      <section class="life-summary">
+        <header>
+          <h2>本月净支出</h2>
+          <span>{{ today.getMonth() + 1 }} 月</span>
+        </header>
+        <Transition name="amount" mode="out-in"
+          ><div :key="summary?.net ?? 'pending'" class="life-amount">
+            <span>¥</span>{{ summary ? money(summary.net) : "—" }}
+          </div></Transition
+        >
+        <p>
+          {{
+            session.activeSpace === "family"
+              ? "家庭共同开支。"
+              : "本人支付，含家庭费用。"
+          }}支出已扣除退款。
+        </p>
+        <button
+          class="text-button"
+          @click="emit('navigate', { page: 'reports' })"
+        >
+          查看报表 <AppIcon name="arrow" :size="16" />
+        </button>
+      </section>
+      <aside class="life-capture">
+        <div class="life-actions" aria-label="快捷记录">
+          <button
+            class="life-record"
+            :disabled="!canWrite"
+            @click="emit('navigate', { page: 'ledger', action: 'create' })"
+          >
+            <AppIcon name="plus" /><span
+              ><strong>记一笔</strong><small>记录日常消费</small></span
+            ><AppIcon name="arrow" :size="18" /></button
+          ><button :disabled="!canWrite" @click="receiptInput?.click()">
+            <AppIcon name="camera" /><span
+              ><strong>拍票据</strong><small>核对后保存</small></span
+            ><AppIcon name="arrow" :size="18" /></button
+          ><button
+            :disabled="!canWrite"
+            @click="emit('navigate', { page: 'tasks', action: 'create' })"
+          >
+            <AppIcon name="tasks" /><span
+              ><strong>新建待办</strong
+              ><small>{{
+                session.activeSpace === "family"
+                  ? "全家一起记得"
+                  : "提醒自己的事"
+              }}</small></span
+            ><AppIcon name="arrow" :size="18" />
+          </button>
+        </div>
+        <button
+          class="life-wardrobe-link"
+          @click="emit('navigate', { page: 'wardrobe' })"
+        >
+          <AppIcon name="wardrobe" :size="17" />打开智能衣柜
+          <AppIcon name="arrow" :size="16" />
+        </button>
+        <input
+          ref="receiptInput"
+          class="sr-only"
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          capture="environment"
+          aria-label="选择要识别的票据"
+          @change="chooseReceipt"
+        />
+      </aside>
       <section class="life-agenda">
         <header class="life-section-heading">
           <h2>
@@ -301,75 +371,6 @@ function chooseReceipt(event: Event) {
           }}
         </p>
       </section>
-      <aside class="life-capture">
-        <section class="life-summary">
-          <header>
-            <h2>本月净支出</h2>
-            <span>{{ today.getMonth() + 1 }} 月</span>
-          </header>
-          <Transition name="amount" mode="out-in"
-            ><div :key="summary?.net ?? 'pending'" class="life-amount">
-              <span>¥</span>{{ summary ? money(summary.net) : "—" }}
-            </div></Transition
-          >
-          <p>
-            {{
-              session.activeSpace === "family"
-                ? "家庭共同开支。"
-                : "本人支付，含家庭费用。"
-            }}支出已扣除退款。
-          </p>
-          <button
-            class="text-button"
-            @click="emit('navigate', { page: 'reports' })"
-          >
-            查看报表 <AppIcon name="arrow" :size="16" />
-          </button>
-        </section>
-        <div class="life-actions" aria-label="快捷记录">
-          <button
-            class="life-record"
-            :disabled="!canWrite"
-            @click="emit('navigate', { page: 'ledger', action: 'create' })"
-          >
-            <AppIcon name="plus" /><span
-              ><strong>记一笔</strong><small>记录日常消费</small></span
-            ><AppIcon name="arrow" :size="18" /></button
-          ><button :disabled="!canWrite" @click="receiptInput?.click()">
-            <AppIcon name="camera" /><span
-              ><strong>拍票据</strong><small>核对后保存</small></span
-            ><AppIcon name="arrow" :size="18" /></button
-          ><button
-            :disabled="!canWrite"
-            @click="emit('navigate', { page: 'tasks', action: 'create' })"
-          >
-            <AppIcon name="tasks" /><span
-              ><strong>新建待办</strong
-              ><small>{{
-                session.activeSpace === "family"
-                  ? "全家一起记得"
-                  : "提醒自己的事"
-              }}</small></span
-            ><AppIcon name="arrow" :size="18" />
-          </button>
-        </div>
-        <button
-          class="life-wardrobe-link"
-          @click="emit('navigate', { page: 'wardrobe' })"
-        >
-          <AppIcon name="wardrobe" :size="17" />打开智能衣柜
-          <AppIcon name="arrow" :size="16" />
-        </button>
-        <input
-          ref="receiptInput"
-          class="sr-only"
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          capture="environment"
-          aria-label="选择要识别的票据"
-          @change="chooseReceipt"
-        />
-      </aside>
     </div>
   </section>
 </template>

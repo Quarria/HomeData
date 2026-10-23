@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import { ApiClientError } from "./api/client";
 import AppIcon from "./components/AppIcon.vue";
+import ThemeSwitcher from "./components/ThemeSwitcher.vue";
 import HomeView from "./components/HomeView.vue";
 import LoginView from "./components/LoginView.vue";
 import PasswordChangeView from "./components/PasswordChangeView.vue";
@@ -259,6 +260,7 @@ function disableLeavingPage(element: Element) {
           </div>
         </div>
         <div class="top-actions">
+          <ThemeSwitcher />
           <span
             v-if="
               session.family?.status === 'ARCHIVED' &&
@@ -339,11 +341,18 @@ function disableLeavingPage(element: Element) {
         v-for="page in pages"
         :key="page.id"
         :class="['mobile-nav-item', { active: activePage === page.id }]"
+        :aria-label="page.title"
         :aria-current="activePage === page.id ? 'page' : undefined"
         @click="navigate({ page: page.id })"
       >
         <span><AppIcon :name="page.id" /></span
-        ><small>{{ page.title === "待办与提醒" ? "待办" : page.title }}</small>
+        ><small>{{
+          page.id === "wardrobe"
+            ? "衣柜"
+            : page.title === "待办与提醒"
+              ? "待办"
+              : page.title
+        }}</small>
       </button>
     </nav>
   </div>

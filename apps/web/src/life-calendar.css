@@ -1,14 +1,14 @@
 /* 06 · 生活日历：保留内容结构，统一跨页视觉与操作节奏。 */
 :root {
-  --accent: #833d50;
-  --accent-soft: #f4e9eb;
-  --nav-surface: #f4ede8;
+  --accent: var(--ink);
+  --accent-soft: var(--soft);
+  --nav-surface: var(--canvas);
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
   font-size: 15px;
 }
 body {
-  background: #faf6f2;
+  background: var(--canvas);
 }
 button,
 input,
@@ -56,7 +56,7 @@ textarea {
 input:focus,
 select:focus,
 textarea:focus {
-  outline: 2px solid #b77d8e;
+  outline: 2px solid var(--ink);
   outline-offset: 2px;
 }
 .ui-icon {
@@ -100,7 +100,7 @@ textarea:focus {
   inset: 0 0 auto;
   height: 48px;
   border-radius: 10px;
-  background: #eadce0;
+  background: var(--highlight);
   transform: translateY(calc(var(--active-index) * 58px));
   transition: transform 220ms var(--ease-out);
   pointer-events: none;
@@ -121,14 +121,14 @@ textarea:focus {
   background: transparent;
 }
 .nav-item:not(.active):hover {
-  background: #eee3e3;
+  background: var(--soft);
 }
 .nav-icon .ui-icon {
   width: 20px;
   height: 20px;
 }
 .space-label {
-  border-top: 1px solid #ded1ce;
+  border-top: 1px solid var(--line);
   color: var(--muted);
   font-size: 13px;
   padding-inline: 6px;
@@ -145,14 +145,14 @@ textarea:focus {
   padding: 10px 6px;
 }
 .profile-button:hover {
-  background: #eadce0;
+  background: var(--highlight);
 }
 .chevron {
   color: var(--muted);
 }
 .avatar {
-  background: #ebdfd9;
-  color: #78364a;
+  background: var(--soft);
+  color: var(--ink);
   font-size: 14px;
 }
 .workspace {
@@ -181,7 +181,7 @@ textarea:focus {
   position: relative;
   padding: 4px;
   border-radius: 12px;
-  background: #eee5df;
+  background: var(--soft);
 }
 .scope-switch button {
   min-height: 34px;
@@ -193,10 +193,10 @@ textarea:focus {
   color: #fff;
 }
 .scope-switch button:hover {
-  background: #e6d5d7;
+  background: var(--soft);
 }
 .scope-switch button.selected:hover {
-  background: #78364a;
+  background: var(--ink);
 }
 .icon-button {
   display: inline-grid;
@@ -250,14 +250,14 @@ textarea:focus {
   color: #fff;
 }
 .primary-button:hover {
-  background: #703044;
+  background: var(--ink);
 }
 .quiet-button {
   background: var(--accent-soft);
   color: var(--accent);
 }
 .quiet-button:hover {
-  background: #ead9de;
+  background: var(--soft);
 }
 .text-button {
   display: inline-flex;
@@ -268,7 +268,7 @@ textarea:focus {
   border-radius: 7px;
 }
 .text-button:hover {
-  background: #f2e6e6;
+  background: var(--soft);
 }
 .primary-button:hover,
 .quiet-button:hover,
@@ -308,7 +308,7 @@ textarea:focus {
 .segmented-control {
   border-radius: 12px;
   padding: 4px;
-  background: #eee5df;
+  background: var(--soft);
 }
 .ledger-space-tabs {
   gap: 12px;
@@ -458,7 +458,7 @@ textarea:focus {
 .report-panel,
 .report-metric,
 .fixed-card {
-  border: 1px solid #eee2df;
+  border: 1px solid var(--line);
   border-radius: 16px;
   background: #fff;
 }
@@ -466,7 +466,7 @@ textarea:focus {
   grid-template-columns:
     38px minmax(130px, 1fr) 80px 76px minmax(95px, 120px)
     35px;
-  border-bottom: 1px solid #eee2df;
+  border-bottom: 1px solid var(--line);
   border-radius: 7px;
 }
 .ledger-list-stage {
@@ -523,7 +523,7 @@ textarea:focus {
   border-bottom: 0;
 }
 .ledger-row:hover {
-  background: #faf2f2;
+  background: var(--soft);
 }
 .ledger-row-mark {
   color: var(--accent);
@@ -552,7 +552,7 @@ textarea:focus {
 }
 .task-row {
   background: #fff;
-  border: 1px solid #eee2df;
+  border: 1px solid var(--line);
   border-radius: 12px;
   min-height: 88px;
 }
@@ -571,7 +571,7 @@ textarea:focus {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  border-color: #b995a0;
+  border-color: var(--ink);
 }
 .task-check:hover {
   color: var(--accent);
@@ -582,7 +582,7 @@ textarea:focus {
   border-color: var(--accent);
 }
 .task-row.completed {
-  background: #f3e9e9;
+  background: var(--soft);
 }
 .fixed-card h3 {
   font-size: 19px;
@@ -612,13 +612,13 @@ textarea:focus {
   color: var(--accent);
 }
 .report-metric.featured {
-  background: #eee3df;
+  background: var(--soft);
   color: var(--ink);
-  border-color: #eee3df;
+  border-color: var(--soft);
 }
 .report-metric.featured > span,
 .report-metric.featured small {
-  color: #70565c;
+  color: var(--muted);
 }
 .report-metric strong {
   font-weight: 400;
@@ -635,12 +635,12 @@ textarea:focus {
   fill: var(--accent);
 }
 .report-rank-track i {
-  background: #a66b7d;
+  background: var(--ink);
   border-radius: 10px;
 }
 .report-rank-track {
   border-radius: 10px;
-  background: #f3e9eb;
+  background: var(--soft);
 }
 .profile-section .section-heading h2 {
   font-size: 21px;
@@ -669,7 +669,7 @@ textarea:focus {
   backdrop-filter: blur(3px);
 }
 .ledger-dialog {
-  background: #faf6f2;
+  background: var(--canvas);
   border-radius: 18px;
   box-shadow: 0 18px 70px #40202c20;
   color: var(--ink);
@@ -689,7 +689,7 @@ textarea:focus {
 .ledger-close,
 .dialog-close {
   border-radius: 50%;
-  background: #eee3df;
+  background: var(--soft);
   color: var(--ink);
 }
 .ledger-form > label,
@@ -812,7 +812,7 @@ textarea:focus {
   align-content: center;
   height: 91px;
   border-radius: 14px;
-  color: #80686c;
+  color: var(--muted);
   font-size: 14px;
   gap: 5px;
 }
@@ -866,7 +866,7 @@ textarea:focus {
 .life-timeline {
   margin-left: 20px;
   padding-left: 27px;
-  border-left: 1px solid #dac3c7;
+  border-left: 1px solid var(--line);
 }
 .life-task {
   position: relative;
@@ -874,7 +874,7 @@ textarea:focus {
   align-items: center;
   gap: 12px;
   background: #fff;
-  border: 1px solid #eee2df;
+  border: 1px solid var(--line);
   border-radius: 12px;
   padding: 23px 18px;
   margin-bottom: 14px;
@@ -886,7 +886,7 @@ textarea:focus {
   width: 9px;
   height: 9px;
   border: 2px solid var(--accent);
-  background: #faf6f2;
+  background: var(--canvas);
   border-radius: 50%;
   left: -35px;
   top: 37px;
@@ -921,7 +921,7 @@ textarea:focus {
   margin: 22px 0 0 48px;
 }
 .life-summary {
-  background: #eee3df;
+  background: var(--soft);
   padding: 27px;
   border-radius: 20px;
 }
@@ -932,7 +932,7 @@ textarea:focus {
 }
 .life-summary header > span {
   font-size: 13px;
-  color: #70565c;
+  color: var(--muted);
 }
 .life-amount {
   font:
@@ -950,7 +950,7 @@ textarea:focus {
 .life-summary p {
   font-size: 14px;
   line-height: 1.8;
-  color: #70565c;
+  color: var(--muted);
   margin: 0;
 }
 .life-summary .text-button {
@@ -990,7 +990,7 @@ textarea:focus {
   margin-top: 2px;
 }
 .life-actions > button:hover {
-  background: #f3e9e9;
+  background: var(--soft);
   border-radius: 12px;
 }
 .life-actions > .life-record {
@@ -1000,7 +1000,7 @@ textarea:focus {
   border-radius: 12px;
 }
 .life-actions > .life-record:hover {
-  background: #703044;
+  background: var(--ink);
 }
 .life-wardrobe-link {
   display: flex;
@@ -1019,7 +1019,7 @@ textarea:focus {
   margin-left: auto;
 }
 .life-record small {
-  color: #f3e3e7;
+  color: var(--ink);
 }
 .life-empty {
   padding: 32px 0 24px 20px;
@@ -1456,7 +1456,7 @@ textarea:focus {
     grid-template-columns: repeat(6, minmax(0, 1fr));
     align-items: start;
     padding: 6px 0 env(safe-area-inset-bottom);
-    background: #faf6f2;
+    background: var(--canvas);
     border-top: 1px solid var(--line);
   }
   .mobile-nav-item {
@@ -1490,7 +1490,7 @@ textarea:focus {
     width: calc(16.6667% - 10px);
     height: 32px;
     border-radius: 18px;
-    background: #eadce0;
+    background: var(--highlight);
     transform: translateX(calc(var(--active-index) * (100% + 10px)));
     transition: transform 220ms var(--ease-out);
   }
@@ -1682,7 +1682,7 @@ textarea:focus {
   background: transparent;
 }
 .scope-switch button:not(.selected):hover {
-  background: #e6d5d7;
+  background: var(--soft);
 }
 .page-leave-active {
   pointer-events: none;
