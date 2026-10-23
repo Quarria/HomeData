@@ -855,3 +855,106 @@ input[type="radio"] {
     white-space: nowrap;
   }
 }
+
+/* Draw every value; sampling is reserved for date labels. */
+.report-chart-wrap {
+  position: relative;
+  padding-top: 62px;
+}
+.report-chart-tooltip {
+  position: absolute;
+  top: 8px;
+  right: 0;
+  z-index: 1;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 7px 12px;
+  background: var(--highlight);
+  border: 1.5px solid var(--ink);
+  border-radius: 7px;
+  box-shadow: 2px 2px var(--ink);
+  font-size: 13px;
+  max-width: 100%;
+  pointer-events: none;
+}
+.report-chart-tooltip strong {
+  font-variant-numeric: tabular-nums;
+}
+.report-chart .report-chart-crosshair {
+  stroke: var(--ink);
+  stroke-width: 1;
+  stroke-dasharray: 4 4;
+}
+.report-chart .report-chart-hit {
+  fill: transparent;
+  stroke: none;
+  cursor: crosshair;
+  pointer-events: all;
+}
+.report-chart .report-chart-hit:focus-visible {
+  outline: none;
+  stroke: var(--ink);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+.report-chart-labels {
+  position: relative;
+  display: block;
+  overflow: visible;
+  height: 32px;
+  margin-left: 14.1667%;
+  margin-right: 3.0556%;
+}
+.report-chart-labels span {
+  position: absolute;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+@media (max-width: 650px) {
+  .report-chart-tooltip {
+    font-size: 12px;
+    gap: 4px 10px;
+  }
+  .report-chart-labels {
+    font-size: 10px;
+  }
+  .report-chart-labels span:first-child {
+    transform: none;
+  }
+  .report-chart-labels span:last-child {
+    transform: translateX(-100%);
+  }
+}
+.report-chart polyline {
+  stroke-dasharray: none;
+  stroke-dashoffset: 0;
+  animation: none;
+}
+.report-trend-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 18px;
+  gap: 12px;
+}
+.report-zoom-note {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--muted);
+  margin: 14px 0 0;
+}
+.report-chart .report-chart-overflow path {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.report-chart-tooltip small {
+  display: block;
+  width: 100%;
+  font-size: 12px;
+}

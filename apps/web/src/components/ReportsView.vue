@@ -6,6 +6,7 @@ import {
   newIdempotencyKey,
   postJson,
 } from "../api/client";
+import { trendScale, type TrendScaleMode } from "../report-trend-scale";
 import SegmentedControl from "./SegmentedControl.vue";
 import { useSessionStore } from "../stores/session";
 
@@ -206,32 +207,55 @@ const query = computed(() => {
   return params;
 });
 
+// Only date labels are sampled. Every data point must participate in the line.
 const visiblePoints = computed(() => {
-  if (points.value.length <= 14) return points.value;
-  const step = Math.ceil(points.value.length / 14);
-  return points.value.filter(
-    (_, index) => index % step === 0 || index === points.value.length - 1,
-  );
+  const count = points.value.length;
+  const labelCount = Math.min(count, 7);
+  return Array.from({ length: labelCount }, (_, index) => {
+    const pointIndex =
+      labelCount <= 1
+        ? 0
+        : Math.round((index * (count - 1)) / (labelCount - 1));
+    return { ...points.value[pointIndex]!, index: pointIndex };
+  });
 });
+const trendScaleMode = ref<TrendScaleMode>("full");
+const trendBounds = computed(() =>
+  trendScale(
+    points.value.map((point) => Number(point.value)),
+    trendScaleMode.value,
+  ),
+);
+function changeTrendScale(value: string) {
+  trendScaleMode.value = value === "daily" ? "daily" : "full";
+}
+const activePointIndex = ref<number | null>(null);
+function clearChartHover(event: MouseEvent) {
+  const container = event.currentTarget;
+  if (
+    container instanceof Element &&
+    container.contains(document.activeElement)
+  )
+    return;
+  activePointIndex.value = null;
+}
 
 const chart = computed(() => {
   const values = points.value.map((point) => Number(point.value));
   if (!values.length) return { line: "", zeroY: 180, points: [] as number[] };
-  const rawMin = Math.min(...values);
-  const rawMax = Math.max(...values);
-  const min = rawMin === 0 && rawMax === 0 ? -1 : Math.min(0, rawMin);
-  const max = rawMin === 0 && rawMax === 0 ? 1 : Math.max(0, rawMax);
-  const spread = Math.max(1, max - min);
-  const y = (value: number) => 18 + ((max - value) / spread) * 150;
+  const { min, max } = trendBounds.value;
+  const spread = max - min || 1;
+  const y = (value: number) =>
+    18 + ((max - Math.min(max, Math.max(min, value))) / spread) * 150;
   const ticks = Array.from({ length: 5 }, (_, index) => {
     const value = max - ((max - min) * index) / 4;
     return { value, y: y(value) };
   });
-  const coords = visiblePoints.value.map((point, index) => {
+  const coords = points.value.map((point, index) => {
     const x =
-      visiblePoints.value.length <= 1
+      points.value.length <= 1
         ? 400
-        : 102 + (index * 596) / (visiblePoints.value.length - 1);
+        : 102 + (index * 596) / (points.value.length - 1);
     return [x, y(Number(point.value))] as const;
   });
   return {
@@ -251,11 +275,34 @@ const trendHasData = computed(() =>
       )
     : Boolean(summary.value?.hasData),
 );
-const chartDots = computed(() => {
-  const values = chart.value.points;
-  return values.flatMap((value, index) =>
-    index % 2 === 0 ? [{ x: value, y: values[index + 1] ?? 0 }] : [],
-  );
+const chartDots = computed(() =>
+  points.value.map((point, index) => ({
+    ...point,
+    overflow:
+      Number(point.value) > trendBounds.value.max
+        ? "above"
+        : Number(point.value) < trendBounds.value.min
+          ? "below"
+          : null,
+    x: chart.value.points[index * 2] ?? 400,
+    y: chart.value.points[index * 2 + 1] ?? 168,
+  })),
+);
+const activeChartPoint = computed(() =>
+  activePointIndex.value === null
+    ? null
+    : (chartDots.value[activePointIndex.value] ?? null),
+);
+const chartHitAreas = computed(() =>
+  chartDots.value.map((point, index, dots) => {
+    const left = index === 0 ? 102 : (dots[index - 1]!.x + point.x) / 2;
+    const right =
+      index === dots.length - 1 ? 698 : (point.x + dots[index + 1]!.x) / 2;
+    return { ...point, left, width: right - left };
+  }),
+);
+watch(chartKey, () => {
+  activePointIndex.value = null;
 });
 
 const categoryMax = computed(() =>
@@ -529,7 +576,7 @@ async function generateAnalysis() {
             ? "AI 服务暂时不可用，请稍后重试。"
             : code.startsWith("AI_OUTPUT_")
               ? "AI 已响应，但分析结果格式不符合要求，请稍后重试。"
-            : "分析未能完成，请稍后重试。";
+              : "分析未能完成，请稍后重试。";
   } finally {
     analysisBusy.value = false;
   }
@@ -822,6 +869,32 @@ onMounted(() => void load());
               }}{{ basis === "net" ? "净支出" : "原始支出" }}
             </span>
           </header>
+          <div class="report-trend-controls">
+            <SegmentedControl
+              :model-value="trendScaleMode"
+              :options="[
+                { value: 'full', label: '完整金额' },
+                { value: 'daily', label: '放大日常' },
+              ]"
+              ariaLabel="趋势图显示范围"
+              size="compact"
+              @update:model-value="changeTrendScale"
+            />
+          </div>
+          <p
+            v-if="trendHasData && trendScaleMode === 'daily'"
+            class="report-zoom-note"
+            role="status"
+          >
+            <template v-if="trendBounds.clipped"
+              >纵轴 {{ formatChartTick(trendBounds.min) }} 至
+              {{ formatChartTick(trendBounds.max) }}；{{
+                trendBounds.clipped
+              }}
+              个日期超出范围，以 ↑ / ↓ 标记。悬浮或点按查看真实金额。</template
+            >
+            <template v-else>当前金额分布无需放大，已显示完整范围。</template>
+          </p>
           <div v-if="!trendHasData" class="report-empty">
             {{
               selectedCategory
@@ -829,13 +902,28 @@ onMounted(() => void load());
                 : "这个周期还没有支出记录。"
             }}
           </div>
-          <div v-else class="report-chart-wrap">
+          <div v-else class="report-chart-wrap" @mouseleave="clearChartHover">
+            <div
+              v-if="activeChartPoint"
+              class="report-chart-tooltip"
+              role="status"
+            >
+              <span>{{ activeChartPoint.period }}</span>
+              <strong
+                >{{ basis === "net" ? "净支出" : "原始支出" }} ¥{{
+                  formatMoney(activeChartPoint.value)
+                }}</strong
+              >
+              <small v-if="activeChartPoint.overflow"
+                >超出纵轴范围 · 显示真实金额</small
+              >
+            </div>
             <svg
               :key="chartKey"
               class="report-chart"
               viewBox="0 0 720 220"
-              role="img"
-              aria-label="所选期间的支出趋势，纵轴金额单位为元"
+              role="group"
+              aria-label="所选期间的支出趋势，纵轴金额单位为元，可悬浮或点按查看金额"
             >
               <g v-for="tick in chart.ticks" :key="tick.value">
                 <line x1="102" x2="698" :y1="tick.y" :y2="tick.y" />
@@ -856,17 +944,80 @@ onMounted(() => void load());
                 :y1="chart.zeroY"
                 :y2="chart.zeroY"
               />
+              <line
+                v-if="activeChartPoint"
+                class="report-chart-crosshair"
+                :x1="activeChartPoint.x"
+                :x2="activeChartPoint.x"
+                y1="18"
+                y2="168"
+              />
               <polyline :points="chart.line" pathLength="1" />
               <circle
                 v-for="(point, index) in chartDots"
                 :key="index"
                 :cx="point.x"
                 :cy="point.y"
-                r="3.5"
+                :r="
+                  point.overflow
+                    ? 0
+                    : activePointIndex === index
+                      ? 5
+                      : chartDots.length > 60
+                        ? 2
+                        : 3.5
+                "
               />
+              <g
+                v-for="point in chartDots.filter((point) => point.overflow)"
+                :key="`overflow-${point.period}`"
+                class="report-chart-overflow"
+                :data-period="point.period"
+                :data-direction="point.overflow"
+                :transform="`translate(${point.x}, ${point.y})`"
+                aria-hidden="true"
+              >
+                <path
+                  :d="
+                    point.overflow === 'above'
+                      ? 'M -5 0 L 0 -7 L 5 0 M 0 -7 V 6'
+                      : 'M -5 0 L 0 7 L 5 0 M 0 7 V -6'
+                  "
+                />
+              </g>
+              <rect
+                v-for="(point, index) in chartHitAreas"
+                :key="point.period"
+                class="report-chart-hit"
+                :x="point.left"
+                :width="point.width"
+                y="12"
+                height="162"
+                role="button"
+                tabindex="0"
+                :aria-label="`${point.period} ${basis === 'net' ? '净支出' : '原始支出'} ¥${formatMoney(point.value)}${point.overflow ? ' 超出纵轴范围' : ''}`"
+                @pointerenter="activePointIndex = index"
+                @pointermove="activePointIndex = index"
+                @click="activePointIndex = index"
+                @focus="activePointIndex = index"
+                @blur="activePointIndex = null"
+                @keydown.enter.prevent="activePointIndex = index"
+                @keydown.space.prevent="activePointIndex = index"
+                @keydown.esc.prevent="activePointIndex = null"
+              >
+                <title>
+                  {{ point.period }} · ¥{{ formatMoney(point.value) }}
+                </title>
+              </rect>
             </svg>
             <div class="report-chart-labels">
-              <span v-for="point in visiblePoints" :key="point.period">
+              <span
+                v-for="point in visiblePoints"
+                :key="point.period"
+                :style="{
+                  left: `${points.length <= 1 ? 50 : (point.index / (points.length - 1)) * 100}%`,
+                }"
+              >
                 {{ formatPeriod(point.period) }}
               </span>
             </div>
