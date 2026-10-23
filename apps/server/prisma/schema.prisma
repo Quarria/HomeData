@@ -111,12 +111,14 @@ enum RecurringFrequency {
 enum RecurringStatus {
   ACTIVE
   PAUSED
+  CANCELLED
 }
 
 enum OccurrenceStatus {
   PENDING
   PAID
   SKIPPED
+  CANCELLED
 }
 
 model Category {

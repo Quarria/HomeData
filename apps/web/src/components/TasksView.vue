@@ -48,7 +48,7 @@ type Rule = {
   frequency: "MONTHLY" | "YEARLY";
   anchorOn: string;
   expectedAmount: string | null;
-  status: "ACTIVE" | "PAUSED";
+  status: "ACTIVE" | "PAUSED" | "CANCELLED";
   version: number;
   canManage: boolean;
   occurrencesNextCursor: string | null;
@@ -381,6 +381,21 @@ async function toggleRule(rule: Rule) {
     error.value = explain(reason, "操作失败，请刷新后重试。");
   }
 }
+async function deleteRule(rule: Rule) {
+  if (
+    !window.confirm(
+      `删除固定费用“${rule.title}”？将停止后续期次和提醒，历史付款及账本记录会保留。`,
+    )
+  )
+    return;
+  try {
+    await deleteJson(`/recurring-rules/${rule.id}`, {});
+    notice.value = "固定费用规则已删除。";
+    await load();
+  } catch (reason) {
+    error.value = explain(reason, "删除失败，请刷新后重试。");
+  }
+}
 async function skipOccurrence(occurrence: Occurrence) {
   try {
     await postJson(`/occurrences/${occurrence.id}/skip`, {
@@ -605,7 +620,9 @@ async function payOccurrence() {
             <button class="quiet-button" @click="openRule(rule)">
               编辑规则</button
             ><button class="quiet-button" @click="toggleRule(rule)">
-              {{ rule.status === "ACTIVE" ? "暂停" : "恢复" }}
+              {{ rule.status === "ACTIVE" ? "暂停" : "恢复" }}</button
+            ><button class="quiet-button" @click="deleteRule(rule)">
+              删除
             </button>
           </footer>
         </article>

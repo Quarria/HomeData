@@ -1,0 +1,2 @@
+ALTER TYPE "RecurringStatus" ADD VALUE 'CANCELLED';
+ALTER TYPE "OccurrenceStatus" ADD VALUE 'CANCELLED';

@@ -179,6 +179,17 @@ export class TasksController {
     );
   }
 
+  @Delete("recurring-rules/:id")
+  async deleteRecurring(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return apiSuccess(
+      request,
+      await this.tasks.deleteRecurring(id, request.account!.id),
+    );
+  }
+
   @Post("recurring-rules/:id/pause")
   async pauseRecurring(
     @Param("id", ParseUUIDPipe) id: string,

@@ -545,8 +545,15 @@ export class TasksService implements OnModuleInit, OnModuleDestroy {
       const rows = await tx.recurringRule.findMany({
         where:
           input.space === "personal"
-            ? { familyId: null, creatorId: accountId }
-            : { familyId: input.familyId! },
+            ? {
+                familyId: null,
+                creatorId: accountId,
+                status: { in: ["ACTIVE", "PAUSED"] },
+              }
+            : {
+                familyId: input.familyId!,
+                status: { in: ["ACTIVE", "PAUSED"] },
+              },
         include: recurringRuleListInclude,
         orderBy: [{ status: "asc" }, { anchorOn: "asc" }, { id: "desc" }],
         take: input.limit + 1,
@@ -710,6 +717,8 @@ export class TasksService implements OnModuleInit, OnModuleDestroy {
       if (!current)
         throw new NotFoundException({ code: "RECURRING_RULE_NOT_FOUND" });
       await this.assertRuleManager(tx, current, accountId);
+      if (current.status === "CANCELLED")
+        throw new ConflictException({ code: "RECURRING_RULE_DELETED" });
       if (current.version !== input.version)
         throw new ConflictException({ code: "VERSION_CONFLICT" });
       if (input.categoryId) {
@@ -766,6 +775,72 @@ export class TasksService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
+  async deleteRecurring(ruleId: string, accountId: string) {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(1213152580)`;
+      await tx.$executeRaw`UPDATE recurring_rules SET version = version WHERE id = ${ruleId}::uuid`;
+      const rule = await tx.recurringRule.findUnique({
+        where: { id: ruleId },
+      });
+      if (!rule)
+        throw new NotFoundException({ code: "RECURRING_RULE_NOT_FOUND" });
+      await this.assertRuleManager(tx, rule, accountId);
+
+      if (rule.status === "CANCELLED") return { id: ruleId, deleted: true };
+      const pendingOccurrences = await tx.occurrence.findMany({
+        where: { ruleId, status: "PENDING" },
+        select: { id: true },
+      });
+      const occurrenceIds = pendingOccurrences.map(({ id }) => id);
+      if (occurrenceIds.length) {
+        const inboxItems = await tx.inboxItem.findMany({
+          where: {
+            subjectType: "OCCURRENCE",
+            subjectId: { in: occurrenceIds },
+          },
+          select: { messageId: true },
+        });
+        const messageIds = [
+          ...new Set(inboxItems.map(({ messageId }) => messageId)),
+        ];
+        await tx.inboxItem.deleteMany({
+          where: {
+            subjectType: "OCCURRENCE",
+            subjectId: { in: occurrenceIds },
+          },
+        });
+        if (messageIds.length) {
+          await tx.inboxMessage.deleteMany({
+            where: { id: { in: messageIds }, items: { none: {} } },
+          });
+        }
+        await tx.occurrence.updateMany({
+          where: { id: { in: occurrenceIds }, status: "PENDING" },
+          data: { status: "CANCELLED", version: { increment: 1 } },
+        });
+      }
+
+      await tx.recurringRule.update({
+        where: { id: ruleId },
+        data: {
+          status: "CANCELLED",
+          version: { increment: 1 },
+          scheduleRevision: { increment: 1 },
+        },
+      });
+      await tx.auditEvent.create({
+        data: {
+          actorId: accountId,
+          action: "RECURRING_RULE_DELETED",
+          subjectType: "RECURRING_RULE",
+          subjectId: ruleId,
+          details: { familyId: rule.familyId },
+        },
+      });
+      return { id: ruleId, deleted: true };
+    });
+  }
+
   async setRecurringStatus(
     ruleId: string,
     accountId: string,
@@ -777,6 +852,8 @@ export class TasksService implements OnModuleInit, OnModuleDestroy {
       if (!rule)
         throw new NotFoundException({ code: "RECURRING_RULE_NOT_FOUND" });
       await this.assertRuleManager(tx, rule, accountId);
+      if (rule.status === "CANCELLED")
+        throw new ConflictException({ code: "RECURRING_RULE_DELETED" });
       if (rule.version !== version)
         throw new ConflictException({ code: "VERSION_CONFLICT" });
       if (rule.status === status)
