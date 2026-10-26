@@ -31,7 +31,10 @@ const reminderPreference = ref({
   taskAdvanceDays: 1,
   feeAdvanceDays: 3,
   overdueEnabled: true,
+  pushPlusEnabled: false,
+  pushPlusConfigured: false,
 });
+const pushPlusToken = ref("");
 const currentAccountId = computed(() => session.account?.id);
 
 watch(
@@ -270,6 +273,58 @@ async function saveReminderPreference() {
   }
 }
 
+async function savePushPlusToken() {
+  if (!pushPlusToken.value.trim()) return;
+  loading.value = true;
+  error.value = "";
+  try {
+    await apiRequest("/notification-preferences/pushplus", {
+      method: "PUT",
+      body: JSON.stringify({ token: pushPlusToken.value.trim() }),
+    });
+    pushPlusToken.value = "";
+    reminderPreference.value.pushPlusConfigured = true;
+    message.value = "PushPlus Token 已加密保存。请发送测试通知确认配置。";
+  } catch (reason) {
+    showError(reason);
+  } finally {
+    loading.value = false;
+  }
+}
+
+async function testPushPlus() {
+  loading.value = true;
+  error.value = "";
+  try {
+    await apiRequest("/notification-preferences/pushplus/test", {
+      method: "POST",
+    });
+    message.value = "PushPlus 已受理测试消息，请稍后检查微信是否收到。";
+  } catch (reason) {
+    showError(reason);
+  } finally {
+    loading.value = false;
+  }
+}
+
+async function removePushPlusToken() {
+  loading.value = true;
+  error.value = "";
+  try {
+    await apiRequest("/notification-preferences/pushplus", {
+      method: "DELETE",
+    });
+    reminderPreference.value.pushPlusConfigured = false;
+    reminderPreference.value.pushPlusEnabled = false;
+    pushPlusToken.value = "";
+    message.value = "PushPlus 已解绑，站内提醒仍会保留。";
+  } catch (reason) {
+    showError(reason);
+  } finally {
+    loading.value = false;
+  }
+}
+
 onMounted(() => void loadReminderPreference());
 </script>
 
@@ -352,7 +407,7 @@ onMounted(() => void loadReminderPreference());
             <div>
               <h2>提醒设置</h2>
             </div>
-            <span class="role-badge">站内提醒</span>
+            <span class="role-badge">站内与微信推送</span>
           </div>
           <form
             class="reminder-settings"
@@ -395,6 +450,65 @@ onMounted(() => void loadReminderPreference());
                 type="checkbox"
               />每天提醒尚未处理的逾期事项</label
             >
+            <div class="pushplus-settings">
+              <strong>PushPlus 微信推送</strong>
+              <p>
+                {{
+                  reminderPreference.pushPlusConfigured
+                    ? "Token 已绑定，提醒将发送到此 Token 对应的微信渠道。"
+                    : "填写 PushPlus Token 后，可将提醒发送到微信。"
+                }}
+              </p>
+              <label class="reminder-field">
+                <span>PushPlus Token</span>
+                <input
+                  v-model="pushPlusToken"
+                  type="password"
+                  autocomplete="new-password"
+                  placeholder="在 PushPlus 个人中心复制 Token"
+                  maxlength="512"
+                />
+              </label>
+              <div class="pushplus-actions">
+                <button
+                  class="quiet-button"
+                  type="button"
+                  :disabled="loading || !pushPlusToken.trim()"
+                  @click="savePushPlusToken"
+                >
+                  {{
+                    reminderPreference.pushPlusConfigured
+                      ? "更新 Token"
+                      : "绑定 Token"
+                  }}
+                </button>
+                <button
+                  class="text-button"
+                  type="button"
+                  :disabled="loading || !reminderPreference.pushPlusConfigured"
+                  @click="testPushPlus"
+                >
+                  发送测试
+                </button>
+                <button
+                  v-if="reminderPreference.pushPlusConfigured"
+                  class="text-button danger-text"
+                  type="button"
+                  :disabled="loading"
+                  @click="removePushPlusToken"
+                >
+                  解绑
+                </button>
+              </div>
+              <label class="reminder-overdue">
+                <input
+                  v-model="reminderPreference.pushPlusEnabled"
+                  type="checkbox"
+                  :disabled="!reminderPreference.pushPlusConfigured"
+                />
+                开启 PushPlus 微信推送
+              </label>
+            </div>
             <button class="quiet-button" :disabled="loading">
               保存提醒偏好
             </button>

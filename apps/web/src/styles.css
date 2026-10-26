@@ -2064,7 +2064,8 @@ a {
   min-width: 0;
 }
 .reminder-settings input[type="time"],
-.reminder-settings input[type="number"] {
+.reminder-settings input[type="number"],
+.reminder-settings input[type="password"] {
   display: block;
   width: 100%;
   min-height: 44px;
@@ -2097,6 +2098,28 @@ a {
 }
 .reminder-settings .reminder-overdue input {
   accent-color: var(--green);
+}
+.pushplus-settings {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+}
+.pushplus-settings > p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.pushplus-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+}
+.pushplus-settings .reminder-overdue {
+  grid-column: auto;
 }
 .reminder-settings > button {
   grid-column: 1 / -1;

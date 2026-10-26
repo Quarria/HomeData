@@ -1090,6 +1090,8 @@ export class TasksService implements OnModuleInit, OnModuleDestroy {
       taskAdvanceDays: preference.taskAdvanceDays,
       feeAdvanceDays: preference.feeAdvanceDays,
       overdueEnabled: preference.overdueEnabled,
+      pushPlusEnabled: preference.pushPlusEnabled,
+      pushPlusConfigured: Boolean(preference.pushPlusToken),
     };
   }
 
@@ -1100,12 +1102,30 @@ export class TasksService implements OnModuleInit, OnModuleDestroy {
       taskAdvanceDays: number;
       feeAdvanceDays: number;
       overdueEnabled: boolean;
+      pushPlusEnabled?: boolean;
     },
   ) {
+    let pushPlusEnabledAt: Date | null = null;
+    if (input.pushPlusEnabled === true) {
+      const current = await this.prisma.reminderPreference.findUnique({
+        where: { accountId },
+        select: {
+          pushPlusToken: true,
+          pushPlusEnabledAt: true,
+        },
+      });
+      if (!current?.pushPlusToken)
+        throw new ConflictException({ code: "PUSHPLUS_TOKEN_REQUIRED" });
+      pushPlusEnabledAt = current.pushPlusEnabledAt ?? new Date();
+    }
+    const updateData = {
+      ...input,
+      ...(input.pushPlusEnabled !== undefined ? { pushPlusEnabledAt } : {}),
+    };
     const preference = await this.prisma.reminderPreference.upsert({
       where: { accountId },
-      create: { accountId, ...input },
-      update: input,
+      create: { accountId, ...updateData },
+      update: updateData,
     });
     await this.prisma.auditEvent.create({
       data: {
@@ -1120,6 +1140,8 @@ export class TasksService implements OnModuleInit, OnModuleDestroy {
       taskAdvanceDays: preference.taskAdvanceDays,
       feeAdvanceDays: preference.feeAdvanceDays,
       overdueEnabled: preference.overdueEnabled,
+      pushPlusEnabled: preference.pushPlusEnabled,
+      pushPlusConfigured: Boolean(preference.pushPlusToken),
     };
   }
 

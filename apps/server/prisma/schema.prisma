@@ -434,27 +434,47 @@ model Occurrence {
 }
 
 model ReminderPreference {
-  accountId       String  @id @map("account_id") @db.Uuid
-  localTime       String  @default("09:00") @map("local_time") @db.VarChar(5)
-  taskAdvanceDays Int     @default(1) @map("task_advance_days")
-  feeAdvanceDays  Int     @default(3) @map("fee_advance_days")
-  overdueEnabled  Boolean @default(true) @map("overdue_enabled")
-  account         Account @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  accountId         String    @id @map("account_id") @db.Uuid
+  localTime         String    @default("09:00") @map("local_time") @db.VarChar(5)
+  taskAdvanceDays   Int       @default(1) @map("task_advance_days")
+  feeAdvanceDays    Int       @default(3) @map("fee_advance_days")
+  overdueEnabled    Boolean   @default(true) @map("overdue_enabled")
+  pushPlusEnabled   Boolean   @default(false) @map("pushplus_enabled")
+  pushPlusEnabledAt DateTime? @map("pushplus_enabled_at") @db.Timestamptz(3)
+  pushPlusToken     String?   @map("pushplus_token") @db.Text
+  account           Account   @relation(fields: [accountId], references: [id], onDelete: Restrict)
 
   @@map("reminder_preferences")
 }
 
+model PushDelivery {
+  id            String       @id @default(uuid()) @db.Uuid
+  messageId     String       @unique @map("message_id") @db.Uuid
+  status        String       @default("PENDING") @db.VarChar(16)
+  attempts      Int          @default(0)
+  nextAttemptAt DateTime     @default(now()) @map("next_attempt_at") @db.Timestamptz(3)
+  providerId    String?      @map("provider_id") @db.VarChar(128)
+  lastError     String?      @map("last_error") @db.VarChar(500)
+  createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+  message       InboxMessage @relation(fields: [messageId], references: [id], onDelete: Restrict)
+
+  @@index([status, nextAttemptAt])
+  @@map("push_deliveries")
+}
+
 model InboxMessage {
-  id             String      @id @default(uuid()) @db.Uuid
-  recipientId    String      @map("recipient_id") @db.Uuid
-  slotAt         DateTime    @map("slot_at") @db.Timestamptz(3)
-  state          String      @default("ACTIVE") @db.VarChar(16)
-  readAt         DateTime?   @map("read_at") @db.Timestamptz(3)
-  frozenAt       DateTime?   @map("frozen_at") @db.Timestamptz(3)
-  payloadVersion Int         @default(1) @map("payload_version")
-  createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
-  recipient      Account     @relation(fields: [recipientId], references: [id], onDelete: Restrict)
+  id             String        @id @default(uuid()) @db.Uuid
+  recipientId    String        @map("recipient_id") @db.Uuid
+  slotAt         DateTime      @map("slot_at") @db.Timestamptz(3)
+  state          String        @default("ACTIVE") @db.VarChar(16)
+  readAt         DateTime?     @map("read_at") @db.Timestamptz(3)
+  frozenAt       DateTime?     @map("frozen_at") @db.Timestamptz(3)
+  payloadVersion Int           @default(1) @map("payload_version")
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  recipient      Account       @relation(fields: [recipientId], references: [id], onDelete: Restrict)
   items          InboxItem[]
+  pushDelivery   PushDelivery?
 
   @@unique([recipientId, slotAt])
   @@index([recipientId, readAt, createdAt])

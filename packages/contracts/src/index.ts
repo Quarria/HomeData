@@ -358,6 +358,11 @@ export const reminderPreferenceRequestSchema = z.object({
   taskAdvanceDays: z.number().int().min(0).max(30),
   feeAdvanceDays: z.number().int().min(0).max(30),
   overdueEnabled: z.boolean(),
+  pushPlusEnabled: z.boolean(),
+});
+
+export const pushPlusTokenRequestSchema = z.object({
+  token: z.string().trim().min(8).max(512),
 });
 
 export const notificationReadRequestSchema = z.object({

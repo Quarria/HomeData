@@ -17,6 +17,7 @@ import {
   expenseVersionRequestSchema,
   occurrencePayRequestSchema,
   reminderPreferenceRequestSchema,
+  pushPlusTokenRequestSchema,
   recurringCreateRequestSchema,
   recurringPatchRequestSchema,
   taskCreateRequestSchema,
@@ -27,12 +28,16 @@ import { z } from "zod";
 import type { AuthenticatedRequest } from "../../shared/auth/auth-types.js";
 import { apiSuccess, parseBody } from "../../shared/http/api-response.js";
 import { TasksService } from "./tasks.service.js";
+import { PushPlusService } from "./pushplus.service.js";
 
 const idempotencyKeySchema = z.string().uuid();
 
 @Controller()
 export class TasksController {
-  constructor(@Inject(TasksService) private readonly tasks: TasksService) {}
+  constructor(
+    @Inject(TasksService) private readonly tasks: TasksService,
+    @Inject(PushPlusService) private readonly pushPlus: PushPlusService,
+  ) {}
 
   private key(value: string | undefined) {
     const parsed = idempotencyKeySchema.safeParse(value);
@@ -321,6 +326,34 @@ export class TasksController {
     return apiSuccess(
       request,
       await this.tasks.updateReminderPreference(request.account!.id, input),
+    );
+  }
+
+  @Put("notification-preferences/pushplus")
+  async savePushPlusToken(
+    @Body() body: unknown,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    const input = parseBody(pushPlusTokenRequestSchema, body);
+    return apiSuccess(
+      request,
+      await this.pushPlus.saveToken(request.account!.id, input.token),
+    );
+  }
+
+  @Delete("notification-preferences/pushplus")
+  async removePushPlusToken(@Req() request: AuthenticatedRequest) {
+    return apiSuccess(
+      request,
+      await this.pushPlus.removeToken(request.account!.id),
+    );
+  }
+
+  @Post("notification-preferences/pushplus/test")
+  async testPushPlus(@Req() request: AuthenticatedRequest) {
+    return apiSuccess(
+      request,
+      await this.pushPlus.sendTest(request.account!.id),
     );
   }
 }

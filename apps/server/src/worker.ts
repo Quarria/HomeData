@@ -6,6 +6,7 @@ import { AppLogger } from "./shared/logging/app-logger.js";
 import { AiService } from "./modules/ai/ai.service.js";
 import { SharesService } from "./modules/shares/shares.service.js";
 import { WardrobeService } from "./modules/wardrobe/wardrobe.service.js";
+import { PushPlusService } from "./modules/tasks/pushplus.service.js";
 
 const intervalMs = 60_000;
 const app = await NestFactory.createApplicationContext(AppModule, {
@@ -16,6 +17,7 @@ const tasks = app.get(TasksService);
 const ai = app.get(AiService);
 const shares = app.get(SharesService);
 const wardrobe = app.get(WardrobeService);
+const pushPlus = app.get(PushPlusService);
 let stopping = false;
 let running = false;
 let aiRunning = false;
@@ -37,8 +39,23 @@ async function scan() {
   }
 }
 
+async function scanPushPlus() {
+  if (stopping) return;
+  try {
+    const result = await pushPlus.runCycle();
+    if (result.accepted)
+      logger.log("PushPlus reminders accepted", { ...result });
+  } catch (error) {
+    logger.error("PushPlus reminder cycle failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
 await scan();
 const timer = setInterval(() => void scan(), intervalMs);
+await scanPushPlus();
+const pushPlusTimer = setInterval(() => void scanPushPlus(), intervalMs);
 async function processAi() {
   if (stopping || aiRunning) return;
   aiRunning = true;
@@ -91,6 +108,7 @@ async function stop() {
   if (stopping) return;
   stopping = true;
   clearInterval(timer);
+  clearInterval(pushPlusTimer);
   clearInterval(aiTimer);
   clearInterval(shareCleanupTimer);
   clearInterval(wardrobeCleanupTimer);
