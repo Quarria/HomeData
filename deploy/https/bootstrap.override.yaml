@@ -1,0 +1,6 @@
+# Managed by HomeData HTTPS. Copied to deploy/compose.override.yaml on the server.
+services:
+  web:
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - /home/docker/homedata/acme:/var/www/certbot:ro

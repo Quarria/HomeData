@@ -11,6 +11,7 @@ test-results/
 *.log
 data/
 deploy/runtime.env
+deploy/compose.override.yaml
 apps/server/prisma/generated/
 .taste-skill/
 deliverables/*.zip
