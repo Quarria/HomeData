@@ -12,6 +12,18 @@ ssh.exe homedata-server
 
 准备条件：域名已指向这台服务器；云安全组允许入站 TCP 80 和 443；服务器能访问 Let's Encrypt 的 ACME 服务；应用当前可通过 HTTP 访问。HTTP-01 首次申请和后续续期都需要公网 80 端口。
 
+阿里云安全组配置路径：ECS 控制台 → 选择服务器所在地域 → 实例 → 目标实例 → 安全组 → 管理规则 → 入方向 → 添加规则。新增以下规则并保存，保留已有 SSH 和 HTTP 规则：
+
+| 设置项 | 值 |
+| --- | --- |
+| 授权策略 | 允许 |
+| 协议 | TCP／HTTPS |
+| 目的端口 | 443/443（部分界面填写 443） |
+| 来源／授权对象 | 0.0.0.0/0 |
+| 描述 | 网站 HTTPS |
+
+只放行网站需要的端口，不选择“全部端口”。如果实例有多个安全组，检查实际关联关系和是否存在优先级更高的拒绝规则。只有配置了可用公网 IPv6、且 DNS 确实发布了对应 AAAA 时，才另外配置 IPv6 443 来源规则。
+
 Cloudflare 橙云可以在申请期间保持开启，前提是它会把 `/.well-known/acme-challenge/` 原样转发到这台服务器，不对该路径启用缓存、登录验证、验证码或拦截规则。多个 A/AAAA 记录必须指向能响应验证的同一套服务，不要保留错误的 IPv6 记录。
 
 以下命令在服务器执行。首次进入时输入实际域名和证书账户邮箱；它们只保留在当前终端变量中，不要把真实凭证写入仓库：
@@ -181,3 +193,4 @@ docker compose --env-file .env ps web
 - [HTTP-01 与 DNS-01 验证](https://letsencrypt.org/docs/challenge-types/)
 - [Certbot 使用、续期与钩子](https://eff-certbot.readthedocs.io/en/stable/using.html)
 - [Cloudflare 代理与仅 DNS](https://developers.cloudflare.com/dns/proxy-status/)
+- [阿里云安全组与常用端口](https://help.aliyun.com/zh/ecs/user-guide/start-using-security-groups)
