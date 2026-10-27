@@ -24,13 +24,25 @@ command -v certbot >/dev/null
 command -v curl >/dev/null
 test -f .env
 test -f runtime.env
+finish_setup() {
+  curl --fail --silent --show-error --max-time 10 \
+    --retry 5 --retry-delay 1 --retry-all-errors \
+    --resolve "$domain:443:127.0.0.1" "https://$domain/api/v1/health/ready" > /dev/null
+  install -d -m 755 /etc/letsencrypt/renewal-hooks/deploy
+  install -m 750 https/reload-nginx.sh /etc/letsencrypt/renewal-hooks/deploy/homedata-nginx
+  systemctl enable --now certbot.timer
+  certbot renew --cert-name "$domain" --dry-run --run-deploy-hooks --non-interactive
+  echo "HTTPS_SETUP_COMPLETE: verify public port 443 before switching Cloudflare to DNS-only."
+}
 if [[ -f compose.override.yaml ]] && ! grep -q '^# Managed by HomeData HTTPS\.' compose.override.yaml; then
   echo "Existing custom Compose override found; merge it before setup." >&2
   exit 1
 fi
 if [[ -f compose.override.yaml ]] && grep -q 'nginx-https.conf' compose.override.yaml; then
-  echo "HTTPS already configured. Use certbot renew and the installed deploy hook." >&2
-  exit 1
+  echo "HTTPS already configured; verifying HTTPS and completing renewal setup."
+  test -s "/etc/letsencrypt/live/$domain/fullchain.pem"
+  finish_setup
+  exit 0
 fi
 
 install -d -m 755 /home/docker/homedata/acme/.well-known/acme-challenge
@@ -76,12 +88,4 @@ if ! docker compose --env-file .env up -d --no-deps --no-build web; then
   echo "HTTPS start failed; restored HTTP entry point." >&2
   exit 1
 fi
-curl --fail --silent --show-error --max-time 10 \
-  --retry 5 --retry-delay 1 --retry-connrefused \
-  --resolve "$domain:443:127.0.0.1" "https://$domain/api/v1/health/ready" > /dev/null
-
-install -d -m 755 /etc/letsencrypt/renewal-hooks/deploy
-install -m 750 https/reload-nginx.sh /etc/letsencrypt/renewal-hooks/deploy/homedata-nginx
-systemctl enable --now certbot.timer
-certbot renew --cert-name "$domain" --dry-run --run-deploy-hooks --non-interactive
-echo "HTTPS_SETUP_COMPLETE: verify public port 443 before switching Cloudflare to DNS-only."
+finish_setup

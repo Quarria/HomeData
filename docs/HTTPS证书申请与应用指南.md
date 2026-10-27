@@ -69,7 +69,7 @@ sudo bash deploy/https/setup.sh "$SITE_DOMAIN" "$CERT_EMAIL"
 
 脚本通过 `--agree-tos` 同意 Let's Encrypt 的服务条款，应在确认接受条款后执行。出现 `HTTPS_SETUP_COMPLETE` 才表示服务器侧配置及续期演练全部完成。它不代表云安全组或 Cloudflare 已完成调整，仍需后面的公网验收。
 
-脚本针对首次配置；成功后不要重复执行。更新或续期使用后文命令。如果申请中途失败且只留下 bootstrap 配置，可以排除原因后重试。若已经启用 HTTPS，只需继续检查和续期，不要回退申请流程。
+日常更新或续期使用后文命令。如果申请中途失败且只留下 bootstrap 配置，可以排除原因后重试。若已经启用 HTTPS，再运行脚本只会验证本机 HTTPS、补全续期钩子与定时器、演练续期，不会重复申请正式证书。
 
 ## 5. 申请到的证书及 Nginx 应用方式
 
