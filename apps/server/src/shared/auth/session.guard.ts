@@ -32,7 +32,9 @@ export class SessionGuard implements CanActivate {
     if (isPublic) return true;
 
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
-    const token = readCookies(request.headers.cookie)[sessionCookieName()];
+    const token = readCookies(request.headers.cookie)[
+      sessionCookieName(request)
+    ];
     if (!token) throw new UnauthorizedException({ code: "AUTH_REQUIRED" });
     const tokenHash = createHash("sha256").update(token).digest("hex");
     const session = await this.prisma.session.findUnique({

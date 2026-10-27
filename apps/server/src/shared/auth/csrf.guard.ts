@@ -7,6 +7,7 @@ import {
 import { timingSafeEqual } from "node:crypto";
 import { readCookies } from "./cookies.js";
 import type { AuthenticatedRequest } from "./auth-types.js";
+import { configuredAppOrigins } from "../config/app-origins.js";
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
@@ -27,18 +28,18 @@ export class CsrfGuard implements CanActivate {
 
     const originHeader = request.headers.origin;
     const origin = typeof originHeader === "string" ? originHeader : undefined;
-    const allowedOrigin = process.env.APP_ORIGIN;
+    const allowedOrigins = configuredAppOrigins();
     if (
       process.env.NODE_ENV === "production" &&
-      (!origin || origin !== allowedOrigin)
+      (!origin || !allowedOrigins.includes(origin))
     ) {
       throw new ForbiddenException({ code: "ORIGIN_NOT_ALLOWED" });
     }
     if (
       origin &&
-      allowedOrigin &&
+      allowedOrigins.length > 0 &&
       process.env.NODE_ENV !== "production" &&
-      origin !== allowedOrigin &&
+      !allowedOrigins.includes(origin) &&
       !/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)
     ) {
       throw new ForbiddenException({ code: "ORIGIN_NOT_ALLOWED" });

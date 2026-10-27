@@ -46,7 +46,7 @@ export class AuthController {
     response: { setHeader(name: string, value: string): void },
   ) {
     const token = randomBytes(32).toString("base64url");
-    response.setHeader("Set-Cookie", csrfCookie(token));
+    response.setHeader("Set-Cookie", csrfCookie(token, request));
     return apiSuccess(request, { token });
   }
 
@@ -66,7 +66,7 @@ export class AuthController {
     );
     response.setHeader(
       "Set-Cookie",
-      sessionCookie(result.rawToken, 7 * 24 * 60 * 60),
+      sessionCookie(result.rawToken, 7 * 24 * 60 * 60, request),
     );
     return apiSuccess(request, {
       account: result.account,
@@ -85,8 +85,8 @@ export class AuthController {
     if (!request.sessionId) throw new UnauthorizedException();
     await this.auth.logout(request.sessionId);
     response.setHeader("Set-Cookie", [
-      clearSessionCookie(),
-      "hd_csrf=; Path=/; Max-Age=0; SameSite=Lax",
+      clearSessionCookie(request),
+      csrfCookie("", request),
     ]);
     return apiSuccess(request, null);
   }
@@ -202,7 +202,7 @@ export class AuthController {
     );
     response.setHeader(
       "Set-Cookie",
-      sessionCookie(result.rawToken, 7 * 24 * 60 * 60),
+      sessionCookie(result.rawToken, 7 * 24 * 60 * 60, request),
     );
     return apiSuccess(request, {
       account: result.account,

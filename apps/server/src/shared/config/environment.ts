@@ -1,5 +1,6 @@
 import { isIP } from "node:net";
 import { z } from "zod";
+import { configuredAppOrigins } from "./app-origins.js";
 
 const environmentSchema = z.object({
   NODE_ENV: z
@@ -8,6 +9,7 @@ const environmentSchema = z.object({
   PORT: z.coerce.number().int().min(1).max(65535).default(3000),
   HOST: z.string().default("0.0.0.0"),
   APP_ORIGIN: z.string().url().optional(),
+  APP_ADDITIONAL_ORIGINS: z.string().optional(),
   DATABASE_URL: z.string().min(1),
   RECEIPT_STORAGE_PATH: z.string().min(1).optional(),
   SESSION_SECRET: z.string().min(32).optional(),
@@ -51,18 +53,40 @@ export function validateEnvironment(
     if (!config.APP_ORIGIN) {
       throw new Error("生产环境必须配置 APP_ORIGIN。");
     }
-    const appOrigin = new URL(config.APP_ORIGIN);
-    if (
-      !["http:", "https:"].includes(appOrigin.protocol) ||
-      appOrigin.pathname !== "/" ||
-      appOrigin.search ||
-      appOrigin.hash
-    ) {
-      throw new Error("APP_ORIGIN 必须是完整的 HTTP 或 HTTPS 来源地址。");
-    }
-    const appHost = appOrigin.hostname.replace(/^\[|\]$/g, "");
-    if (appOrigin.protocol === "http:" && isIP(appHost) === 0) {
-      throw new Error("生产环境使用 HTTP 时，APP_ORIGIN 只能配置为 IP 地址。");
+    const originHosts = new Map<string, string>();
+    for (const value of configuredAppOrigins(config)) {
+      let appOrigin: URL;
+      try {
+        appOrigin = new URL(value);
+      } catch {
+        throw new Error(
+          "APP_ORIGIN / APP_ADDITIONAL_ORIGINS 必须是完整的 HTTP 或 HTTPS 来源地址。",
+        );
+      }
+      if (
+        !["http:", "https:"].includes(appOrigin.protocol) ||
+        appOrigin.pathname !== "/" ||
+        appOrigin.search ||
+        appOrigin.hash ||
+        appOrigin.username ||
+        appOrigin.password ||
+        value !== appOrigin.origin
+      ) {
+        throw new Error("APP_ORIGIN 必须是完整的 HTTP 或 HTTPS 来源地址。");
+      }
+      const appHost = appOrigin.hostname.replace(/^\[|\]$/g, "");
+      if (appOrigin.protocol === "http:" && isIP(appHost) === 0) {
+        throw new Error(
+          "生产环境使用 HTTP 时，APP_ORIGIN 只能配置为 IP 地址。",
+        );
+      }
+      const protocol = originHosts.get(appOrigin.host);
+      if (protocol && protocol !== appOrigin.protocol) {
+        throw new Error(
+          "同一访问主机只能配置一种协议，以确定会话 Cookie 的安全属性。",
+        );
+      }
+      originHosts.set(appOrigin.host, appOrigin.protocol);
     }
     if (
       config.SESSION_SECRET?.startsWith("REPLACE_WITH_") ||

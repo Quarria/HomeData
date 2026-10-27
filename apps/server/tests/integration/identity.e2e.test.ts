@@ -1,6 +1,7 @@
 import "reflect-metadata";
 import { randomUUID } from "node:crypto";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { request as httpRequest } from "node:http";
+import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -10,6 +11,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { PGLiteSocketServer } from "@electric-sql/pglite-socket";
 import { PrismaClient } from "../../prisma/generated/client/client.js";
 import { hashPassword } from "../../src/shared/auth/password.js";
+import { PrismaService } from "../../src/shared/database/prisma.service.js";
 import { AppModule } from "../../src/modules/app.module.js";
 import { AppLogger } from "../../src/shared/logging/app-logger.js";
 import { ApiExceptionFilter } from "../../src/shared/http/api-exception.filter.js";
@@ -42,6 +44,45 @@ function cookiePair(response: Response, name: string) {
 }
 
 async function api(path: string, init: RequestInit = {}) {
+  // Node fetch overwrites Host; use the HTTP client to exercise real proxy Host forwarding.
+  if (new Headers(init.headers).has("host")) {
+    return new Promise<Response>((resolveResponse, reject) => {
+      const headers = new Headers(init.headers);
+      if (init.body) headers.set("content-type", "application/json");
+      const request = httpRequest(
+        `${baseUrl}/api/v1${path}`,
+        {
+          method: init.method ?? "GET",
+          headers: Object.fromEntries(headers),
+        },
+        (response) => {
+          let body = "";
+          response.setEncoding("utf8");
+          response.on("data", (chunk: string) => {
+            body += chunk;
+          });
+          response.on("error", reject);
+          response.on("end", () => {
+            const responseHeaders = new Headers();
+            for (let i = 0; i < response.rawHeaders.length; i += 2) {
+              responseHeaders.append(
+                response.rawHeaders[i]!,
+                response.rawHeaders[i + 1]!,
+              );
+            }
+            resolveResponse(
+              new Response(body, {
+                status: response.statusCode!,
+                headers: responseHeaders,
+              }),
+            );
+          });
+        },
+      );
+      request.on("error", reject);
+      request.end(init.body);
+    });
+  }
   return fetch(`${baseUrl}/api/v1${path}`, {
     ...init,
     headers: {
@@ -79,15 +120,16 @@ describe("account, family, and ledger flows", () => {
     });
     await socketServer.start();
 
-    for (const migration of [
-      "20261015000000_init/migration.sql",
-      "20261015010000_identity/migration.sql",
-      "20261015010100_family_default_city/migration.sql",
-      "20261015020000_ledger/migration.sql",
-      "20261015030000_tasks_recurring/migration.sql",
-    ]) {
+    const migrations = await readdir(
+      resolve(process.cwd(), "prisma/migrations"),
+      { withFileTypes: true },
+    );
+    for (const migration of migrations
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name)
+      .sort()) {
       const sql = await readFile(
-        resolve(process.cwd(), "prisma/migrations", migration),
+        resolve(process.cwd(), "prisma/migrations", migration, "migration.sql"),
         "utf8",
       );
       await database.exec(sql);
@@ -619,5 +661,88 @@ describe("account, family, and ledger flows", () => {
     expect(restored.status).toBe(201);
     expect((await restored.json()).data.refund).toBe("60.00");
     expect(successfulRefund.id).toBeTruthy();
+  });
+
+  it("logs in, reads the session, rotates passwords and logs out through both production entry points", async () => {
+    const previous = { ...process.env };
+    process.env.NODE_ENV = "production";
+    process.env.APP_ORIGIN = "https://ledger.example.test";
+    process.env.APP_ADDITIONAL_ORIGINS = "http://203.0.113.10:8080";
+    try {
+      // A separate temporary account keeps this test independent of password changes above.
+      const account = await app!.get(PrismaService).account.create({
+        data: {
+          username: "dualentry",
+          usernameNormalized: "dualentry",
+          nickname: "双入口测试",
+          passwordHash: await hashPassword("DualEntryPassword!234"),
+          mustChangePassword: false,
+        },
+      });
+      let password = "DualEntryPassword!234";
+      for (const origin of [
+        process.env.APP_ORIGIN,
+        process.env.APP_ADDITIONAL_ORIGINS,
+      ]) {
+        const host = new URL(origin).host;
+        const secure = origin.startsWith("https:");
+        const name = secure ? "__Host-hd_session" : "hd_session";
+        const csrf = await api("/auth/csrf", { headers: { host } });
+        expect(csrf.headers.get("set-cookie")!.includes("; Secure")).toBe(
+          secure,
+        );
+        const token = (await csrf.json()).data.token;
+        const csrfPair = cookiePair(csrf, "hd_csrf");
+        const headers = {
+          host,
+          origin,
+          "x-csrf-token": token,
+          cookie: csrfPair,
+        };
+        const login = await api("/auth/login", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ username: "dualentry", password }),
+        });
+        expect(login.status, await login.clone().text()).toBe(201);
+        expect(login.headers.get("set-cookie")!.includes("; Secure")).toBe(
+          secure,
+        );
+        const firstSession = cookiePair(login, name);
+        const me = await api("/me", {
+          headers: { host, cookie: firstSession },
+        });
+        expect(me.status).toBe(200);
+        expect((await me.json()).data.account.id).toBe(account.id);
+        const nextPassword = password + "x";
+        const changed = await api("/me/password", {
+          method: "POST",
+          headers: { ...headers, cookie: `${csrfPair}; ${firstSession}` },
+          body: JSON.stringify({
+            currentPassword: password,
+            newPassword: nextPassword,
+          }),
+        });
+        expect(changed.status, await changed.clone().text()).toBe(201);
+        password = nextPassword;
+        const session = cookiePair(changed, name);
+        const logout = await api("/auth/logout", {
+          method: "POST",
+          headers: { ...headers, cookie: `${csrfPair}; ${session}` },
+          body: "{}",
+        });
+        expect(logout.status).toBe(201);
+        const cleared = logout.headers
+          .getSetCookie()
+          .find((value) => value.startsWith(name + "="))!;
+        expect(cleared).toContain("Max-Age=0");
+        expect(cleared.includes("; Secure")).toBe(secure);
+        expect(
+          (await api("/me", { headers: { host, cookie: session } })).status,
+        ).toBe(401);
+      }
+    } finally {
+      process.env = previous;
+    }
   });
 });
