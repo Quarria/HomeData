@@ -21,6 +21,7 @@ import { AuthService, accountSummary } from "./auth.service.js";
 import { PrismaService } from "../../shared/database/prisma.service.js";
 import {
   AllowPasswordChange,
+  MiniprogramLogin,
   Public,
 } from "../../shared/auth/auth-metadata.js";
 import {
@@ -69,6 +70,27 @@ export class AuthController {
       sessionCookie(result.rawToken, 7 * 24 * 60 * 60, request),
     );
     return apiSuccess(request, {
+      account: result.account,
+      family: null,
+      mustChangePassword: result.account.mustChangePassword,
+    });
+  }
+
+  @Public()
+  @MiniprogramLogin()
+  @Post("auth/miniprogram/login")
+  async miniprogramLogin(
+    @Body() body: unknown,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    const input = parseBody(loginRequestSchema, body);
+    const result = await this.auth.login(
+      input.username,
+      input.password,
+      request.ip ?? "unknown",
+    );
+    return apiSuccess(request, {
+      token: result.rawToken,
       account: result.account,
       family: null,
       mustChangePassword: result.account.mustChangePassword,
@@ -200,14 +222,17 @@ export class AuthController {
       input.currentPassword,
       input.newPassword,
     );
-    response.setHeader(
-      "Set-Cookie",
-      sessionCookie(result.rawToken, 7 * 24 * 60 * 60, request),
-    );
+    if (!request.sessionToken) {
+      response.setHeader(
+        "Set-Cookie",
+        sessionCookie(result.rawToken, 7 * 24 * 60 * 60, request),
+      );
+    }
     return apiSuccess(request, {
       account: result.account,
       family: null,
       mustChangePassword: false,
+      ...(request.sessionToken ? { token: result.rawToken } : {}),
     });
   }
 }

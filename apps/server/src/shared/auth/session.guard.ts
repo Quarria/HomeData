@@ -32,9 +32,21 @@ export class SessionGuard implements CanActivate {
     if (isPublic) return true;
 
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
-    const token = readCookies(request.headers.cookie)[
+    const authorization = request.headers.authorization;
+    const cookieToken = readCookies(request.headers.cookie)[
       sessionCookieName(request)
     ];
+    if (authorization && request.headers.cookie) {
+      throw new UnauthorizedException({ code: "AUTH_METHOD_AMBIGUOUS" });
+    }
+    const bearer =
+      typeof authorization === "string"
+        ? /^Bearer ([A-Za-z0-9_-]{40,})$/.exec(authorization)
+        : null;
+    if (authorization && !bearer) {
+      throw new UnauthorizedException({ code: "AUTH_REQUIRED" });
+    }
+    const token = bearer?.[1] ?? cookieToken;
     if (!token) throw new UnauthorizedException({ code: "AUTH_REQUIRED" });
     const tokenHash = createHash("sha256").update(token).digest("hex");
     const session = await this.prisma.session.findUnique({
@@ -79,6 +91,7 @@ export class SessionGuard implements CanActivate {
     }
     request.account = session.account;
     request.sessionId = session.id;
+    if (bearer) request.sessionToken = token;
     return true;
   }
 }

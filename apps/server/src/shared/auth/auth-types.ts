@@ -7,4 +7,5 @@ export interface AuthenticatedRequest {
   ip?: string;
   account?: Account;
   sessionId?: string;
+  sessionToken?: string;
 }
