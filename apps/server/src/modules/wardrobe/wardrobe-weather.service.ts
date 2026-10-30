@@ -5,7 +5,6 @@ import { PrismaService } from "../../shared/database/prisma.service.js";
 const GEOCODING_URL = "https://geocoding-api.open-meteo.com/v1/search";
 const FORECAST_URL = "https://api.open-meteo.com/v1/forecast";
 const CACHE_TTL_MS = 45 * 60 * 1000;
-const MANUAL_REFRESH_MIN_INTERVAL_MS = 5 * 60 * 1000;
 const LOCATION_TTL_MS = 60 * 60 * 1000;
 const FORECAST_DAYS = 16;
 
@@ -164,10 +163,7 @@ export class WardrobeWeatherService {
     return items;
   }
 
-  async forecast(
-    input: { city: City; startDate: string; days: number },
-    options: { forceRefresh?: boolean } = {},
-  ) {
+  async forecast(input: { city: City; startDate: string; days: number }) {
     const today = localToday();
     const forecastTo = addDays(today, FORECAST_DAYS - 1);
     const key = locationKey(input.city);
@@ -185,13 +181,7 @@ export class WardrobeWeatherService {
     let data: WeatherDay[];
     let fetchedAt: Date;
     let isStale = false;
-    let fetchedFromSource = false;
-    const forceRefreshAllowed =
-      options.forceRefresh === true &&
-      (!cached ||
-        Date.now() - cached.fetchedAt.getTime() >=
-          MANUAL_REFRESH_MIN_INTERVAL_MS);
-    if (cached && cached.expiresAt > new Date() && !forceRefreshAllowed) {
+    if (cached && cached.expiresAt > new Date()) {
       data = cached.data as unknown as WeatherDay[];
       fetchedAt = cached.fetchedAt;
     } else {
@@ -213,7 +203,6 @@ export class WardrobeWeatherService {
         });
         data = weatherDays(await this.fetchJson(`${FORECAST_URL}?${params}`));
         fetchedAt = new Date();
-        fetchedFromSource = true;
         await this.prisma.wardrobeWeatherCache.upsert({
           where: {
             locationKey_forecastFrom_forecastTo: {
@@ -270,7 +259,6 @@ export class WardrobeWeatherService {
       attribution: "天气数据：Open-Meteo（CC BY 4.0）",
       fetchedAt,
       isStale,
-      fetchedFromSource,
       forecastThrough: forecastTo,
     };
   }
