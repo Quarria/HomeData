@@ -57,9 +57,16 @@ export class WardrobeController {
   }
 
   @Post("weather/forecast")
-  async forecast(@Body() body: unknown, @Req() request: AuthenticatedRequest) {
+  async forecast(
+    @Body() body: unknown,
+    @Query("refresh") refresh: string | undefined,
+    @Req() request: AuthenticatedRequest,
+  ) {
     const input = parseBody(wardrobeWeatherRequestSchema, body);
-    return apiSuccess(request, await this.weather.forecast(input));
+    return apiSuccess(
+      request,
+      await this.weather.forecast(input, { forceRefresh: refresh === "true" }),
+    );
   }
 
   @Post("recommendations/daily")
